@@ -51,13 +51,38 @@ AI turned off. See the feature list below.
 
 ## Quick start
 
-One-time setup:
+### Prerequisites
+
+- Python 3.11+ (`python3 --version`)
+- Node 18+ and npm (`node --version`)
+- `make` and a POSIX shell (bash). Comes standard on Linux and macOS.
+  **On Windows, use WSL2** (`wsl --install` from an admin PowerShell, then
+  clone and run everything inside the WSL distro) — the launcher script is
+  bash, and the Makefile assumes a Unix venv layout. Native `cmd.exe`/
+  PowerShell without WSL is not supported out of the box.
+- git
+
+### 1. Clone
+
+```
+git clone https://github.com/xoaswin/Jira-tracker.git
+cd Jira-tracker
+```
+
+### 2. Install dependencies
 
 ```
 make install
 ```
 
 That creates the backend virtualenv, installs Python and Node dependencies.
+No `.env` file is required to get started — every setting has a working
+default and the app is fully configured from the UI (see step 4). Only copy
+`.env.example` to `.env` if you want to override a default up front (for
+example `GIT_REPO_PATHS` for the git-diff-to-worklog feature, or
+`AI_PROVIDER`).
+
+### 3. Run
 
 Run both dev servers (FastAPI on 8756, Vite on 5173 proxying /api):
 
@@ -65,10 +90,16 @@ Run both dev servers (FastAPI on 8756, Vite on 5173 proxying /api):
 make dev
 ```
 
+### 4. Connect to Jira
+
 Open http://localhost:5173, go to Settings, and connect with your Jira base URL,
 email, and an API token (create one at id.atlassian.com under Security, API
 tokens). The token is stored in your OS keychain, never in the database or a
 file in the repo.
+
+If you're on WSL2 and opening the app from a Windows browser, both dev servers
+already bind `0.0.0.0` so `http://localhost:5173` is reachable across the
+WSL2 boundary without extra config.
 
 Production single process:
 
