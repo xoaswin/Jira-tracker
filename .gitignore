@@ -1,0 +1,25 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+backend/data/*.db
+backend/data/*.db-journal
+backend/logs/
+.pytest_cache/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env and secrets (the token lives in the OS keychain, never a file in the repo)
+.env
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code local settings (machine-specific permission allowlist)
+.claude/settings.local.json

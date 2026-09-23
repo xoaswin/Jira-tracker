@@ -1,0 +1,40 @@
+[project]
+name = "jira-tracker-backend"
+version = "0.1.0"
+description = "Local-first work session tracker that syncs worklogs and comments to Jira"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy>=2",
+    "httpx",
+    "keyring",
+    "pydantic-settings",
+    "alembic",
+    "apscheduler",
+    "python-dateutil",
+    # Phase 3 matching: BM25 keyword ranking + numpy for embedding vectors.
+    # These are light and always installed.
+    "rank-bm25",
+    "numpy",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "respx", "pytest-asyncio"]
+# Phase 3 semantic matching (optional). sentence-transformers pulls in torch,
+# which is large; the app is fully usable without it (BM25 + recency), and the
+# ranker redistributes weights when embeddings are absent. Install with a
+# CPU-only torch wheel to avoid the CUDA stack, e.g.:
+#   pip install sentence-transformers --extra-index-url \
+#       https://download.pytorch.org/whl/cpu
+embeddings = ["sentence-transformers"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
