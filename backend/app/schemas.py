@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # --- auth ---
@@ -473,6 +473,34 @@ class DayPlanOut(BaseModel):
     total_samples: int  # how much history the velocity is based on
     items: list[PlanItemOut] = Field(default_factory=list)
     velocity_by_type: list[TypeVelocityOut] = Field(default_factory=list)
+
+
+# --- start-of-day intention (the user's own plan, not the ranked auto-plan) ---
+
+class DayIntentionIn(BaseModel):
+    plan_date: str  # "YYYY-MM-DD" in the user's local clock
+    note: str = ""
+    ticket_keys: list[str] = Field(default_factory=list)
+
+    @field_validator("plan_date")
+    @classmethod
+    def _valid_date(cls, v: str) -> str:
+        # Bare local date; reject anything that isn't YYYY-MM-DD so a bad client
+        # can't scatter junk keys across the one-row-per-day table.
+        try:
+            date.fromisoformat(v)
+        except ValueError as exc:
+            raise ValueError("plan_date must be YYYY-MM-DD") from exc
+        return v
+
+
+class DayIntentionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    plan_date: str
+    note: str
+    ticket_keys: list[str] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
 
 
 class EstimateOut(BaseModel):

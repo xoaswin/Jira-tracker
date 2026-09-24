@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Jira Tracker</title>
+    <style>
+      /* The window itself is transparent; the pill below is the only visible
+         surface. The whole pill is a drag region (move it anywhere) except the
+         buttons, which are marked no-drag so they stay clickable. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        user-select: none;
+        cursor: default;
+      }
+      #pill {
+        -webkit-app-region: drag;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 38px;
+        margin: 7px;
+        padding: 0 6px 0 12px;
+        border-radius: 19px;
+        background: #0f172a;
+        border: 1px solid #1e293b;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+        color: #e2e8f0;
+      }
+      #dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #64748b;
+        flex: none;
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+      }
+      #dot.active {
+        background: #22c55e;
+        animation: pulse 2s infinite;
+      }
+      #dot.paused {
+        background: #f59e0b;
+      }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+        70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+      }
+      #label {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+      }
+      #key {
+        font-weight: 600;
+        font-size: 12.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 96px;
+      }
+      #key.idle {
+        color: #94a3b8;
+        font-weight: 500;
+      }
+      #time {
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: #cbd5e1;
+        white-space: nowrap;
+      }
+      .btn {
+        -webkit-app-region: no-drag;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: #94a3b8;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+      }
+      .btn:hover {
+        background: #1e293b;
+        color: #e2e8f0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pill" title="Drag to move">
+      <span id="dot"></span>
+      <span id="label">
+        <span id="key" class="idle">Loading…</span>
+        <span id="time"></span>
+      </span>
+      <button class="btn" id="checkin" title="Check in now">&#9679;</button>
+      <button class="btn" id="open" title="Open Jira Tracker">&#10530;</button>
+    </div>
+
+    <script>
+      const dot = document.getElementById("dot");
+      const keyEl = document.getElementById("key");
+      const timeEl = document.getElementById("time");
+
+      // Live-ticked from the last poll so the timer counts smoothly between
+      // the (cheaper) 15s status fetches.
+      let baseElapsed = 0; // seconds at last poll
+      let baseAt = Date.now();
+      let running = false;
+
+      function fmt(total) {
+        total = Math.max(0, Math.floor(total));
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+        const mm = String(m).padStart(2, "0");
+        const ss = String(s).padStart(2, "0");
+        return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+      }
+
+      function render(status) {
+        const s = status && status.session;
+        if (!status || !status.connected) {
+          dot.className = "";
+          keyEl.className = "idle";
+          keyEl.textContent = status && !status.connected ? "Connect Jira" : "Offline";
+          timeEl.textContent = "";
+          running = false;
+          return;
+        }
+        if (!s) {
+          dot.className = "";
+          keyEl.className = "idle";
+          keyEl.textContent = "Not tracking";
+          timeEl.textContent = "";
+          running = false;
+          return;
+        }
+        const active = s.state === "active";
+        dot.className = active ? "active" : "paused";
+        keyEl.className = "";
+        keyEl.textContent = s.issue_key || (s.description ? s.description.slice(0, 18) : "Session");
+        keyEl.title = s.description || s.issue_key || "";
+        baseElapsed = typeof s.elapsed_seconds === "number" ? s.elapsed_seconds : 0;
+        baseAt = Date.now();
+        running = active;
+        timeEl.textContent = fmt(baseElapsed);
+      }
+
+      async function poll() {
+        try {
+          render(await window.desktop.getStatus());
+        } catch (e) {
+          /* backend not up yet; keep last render */
+        }
+      }
+
+      // Smooth local tick; only advances while the session is active.
+      setInterval(() => {
+        if (!running) return;
+        timeEl.textContent = fmt(baseElapsed + (Date.now() - baseAt) / 1000);
+      }, 1000);
+
+      setInterval(poll, 15000);
+      poll();
+
+      document.getElementById("open").addEventListener("click", () => window.desktop.openApp());
+      document.getElementById("checkin").addEventListener("click", () => window.desktop.triggerNudge());
+    </script>
+  </body>
+</html>

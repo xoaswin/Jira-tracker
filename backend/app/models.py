@@ -179,3 +179,28 @@ class AppSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class DayIntention(Base):
+    """The user's own start-of-day plan for a given local date.
+
+    Deliberately independent of any work session, so the day's intended focus
+    persists even when no timer is running (the desktop check-in nudges read it
+    back, and it can be reused to start a session later). One row per local
+    date, upserted. ``note`` is free text ("finish PAY-431, review PRs");
+    ``ticket_keys`` is a JSON list of Jira keys the user means to work on.
+    """
+
+    __tablename__ = "day_intentions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Local calendar date "YYYY-MM-DD". This is a single-user, local-clock app
+    # (see PROJECT_CONTEXT rule 4); storing the bare date as a string sidesteps
+    # any tz ambiguity that a DATE/DATETIME column would invite.
+    plan_date: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    ticket_keys: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )

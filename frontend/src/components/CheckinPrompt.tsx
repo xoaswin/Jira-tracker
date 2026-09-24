@@ -33,7 +33,16 @@ export function CheckinPrompt() {
   // measured from the last interaction, not from app load.
   const lastPromptRef = useRef<number>(Date.now());
 
-  const intervalMin = settings.data?.checkin_interval_minutes ?? 0;
+  // In the desktop build, the native always-on-top nudge window owns check-ins
+  // (main.js tags the user agent). Suppress this in-page modal there so the
+  // user isn't prompted twice; the web build keeps it.
+  const isDesktopShell =
+    typeof navigator !== "undefined" &&
+    navigator.userAgent.includes("JiraTrackerDesktop");
+
+  const intervalMin = isDesktopShell
+    ? 0
+    : settings.data?.checkin_interval_minutes ?? 0;
   const workStart = settings.data?.work_start_time ?? null;
   const workEnd = settings.data?.work_end_time ?? null;
   const session = active.data;

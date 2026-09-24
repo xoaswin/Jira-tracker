@@ -161,4 +161,9 @@ def _print_routes() -> None:  # small dev helper
 if __name__ == "__main__":  # pragma: no cover
     import uvicorn
 
-    uvicorn.run("app.main:app", host="127.0.0.1", port=get_settings().app_port, reload=True)
+    # Passing the app object directly (not the "app.main:app" dotted string)
+    # and reload=False matter for the desktop-packaged build: reload spawns a
+    # watcher/worker process pair that re-imports the dotted path, which does
+    # not work inside a frozen PyInstaller exe. This is also the entrypoint
+    # PyInstaller freezes (backend/packaging/build_backend.ps1).
+    uvicorn.run(app, host="127.0.0.1", port=get_settings().app_port, reload=False)

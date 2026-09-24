@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Plan your day</title>
+    <style>
+      html, body { margin: 0; height: 100%; }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #1e293b;
+        border-radius: 12px;
+        overflow: hidden;
+        user-select: none;
+      }
+      #bar {
+        -webkit-app-region: drag;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+        border-bottom: 1px solid #1e293b;
+      }
+      main { padding: 18px 22px 20px; flex: 1; display: flex; flex-direction: column; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .sub { font-size: 12.5px; color: #94a3b8; margin: 0 0 16px; }
+      label { font-size: 12px; color: #cbd5e1; display: block; margin: 0 0 6px; font-weight: 600; }
+      textarea, input {
+        -webkit-app-region: no-drag;
+        width: 100%;
+        box-sizing: border-box;
+        background: #0b1424;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        color: #e2e8f0;
+        font: inherit;
+        font-size: 13px;
+        padding: 9px 11px;
+      }
+      textarea { resize: none; margin: 0 0 14px; }
+      input { margin: 0 0 4px; }
+      .hint { font-size: 11px; color: #64748b; margin: 0 0 16px; }
+      textarea:focus, input:focus { outline: none; border-color: #6366f1; }
+      .row { display: flex; gap: 8px; margin-top: auto; }
+      button {
+        -webkit-app-region: no-drag;
+        flex: 1;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .primary { background: #6366f1; color: #fff; }
+      .primary:hover { background: #4f46e5; }
+      .ghost { background: transparent; border-color: #334155; color: #cbd5e1; }
+      .ghost:hover { background: #1e293b; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">Jira Tracker &middot; start of day</div>
+    <main>
+      <h1 id="greeting">Plan your day</h1>
+      <p class="sub">What are you aiming to get done today? The hourly check-in will nudge you against this.</p>
+
+      <label for="note">Today's focus</label>
+      <textarea id="note" rows="4" placeholder="e.g. Finish PAY-431, review 2 PRs, prep the sprint demo"></textarea>
+
+      <label for="keys">Tickets (optional)</label>
+      <input id="keys" placeholder="PAY-431, PAY-440" />
+      <p class="hint">Comma-separated Jira keys you plan to work on.</p>
+
+      <div class="row">
+        <button class="primary" id="save">Save plan</button>
+        <button class="ghost" id="skip">Skip for now</button>
+      </div>
+    </main>
+
+    <script>
+      const noteEl = document.getElementById("note");
+      const keysEl = document.getElementById("keys");
+
+      function localDate() {
+        const d = new Date();
+        const p = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      }
+
+      (function greet() {
+        const h = new Date().getHours();
+        const g = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+        document.getElementById("greeting").textContent = g + " — plan your day";
+      })();
+
+      // Prefill if a plan already exists for today (re-opened from the tray).
+      (async function prefill() {
+        try {
+          const existing = await window.desktop.getIntention(localDate());
+          if (existing) {
+            noteEl.value = existing.note || "";
+            keysEl.value = (existing.ticket_keys || []).join(", ");
+          }
+        } catch (e) {
+          /* backend not ready; start blank */
+        }
+        noteEl.focus();
+      })();
+
+      document.getElementById("save").addEventListener("click", async () => {
+        const keys = keysEl.value
+          .split(",")
+          .map((k) => k.trim().toUpperCase())
+          .filter(Boolean);
+        try {
+          await window.desktop.saveIntention({
+            plan_date: localDate(),
+            note: noteEl.value.trim(),
+            ticket_keys: keys,
+          });
+        } catch (e) {
+          /* best-effort; closing anyway so we never block the user */
+        }
+        window.desktop.closePlan();
+      });
+
+      document.getElementById("skip").addEventListener("click", () => window.desktop.closePlan());
+    </script>
+  </body>
+</html>

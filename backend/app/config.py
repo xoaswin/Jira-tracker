@@ -20,7 +20,18 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Repository backend root: .../jira-tracker/backend
-BACKEND_ROOT = Path(__file__).resolve().parent.parent
+#
+# Under a frozen PyInstaller build, __file__ does not reliably point at a real
+# extracted path, so BACKEND_ROOT must be derived from sys._MEIPASS instead.
+# The desktop packaging step (backend/packaging/) bundles alembic.ini,
+# alembic/, and ../frontend/dist mirroring the source tree's layout under a
+# "backend/" folder in the bundle root, so this still resolves every
+# BACKEND_ROOT-relative path (alembic config, frontend static files, .env)
+# exactly like the unfrozen dev layout does.
+if getattr(sys, "frozen", False):
+    BACKEND_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "backend"
+else:
+    BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):

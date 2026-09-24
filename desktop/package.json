@@ -1,0 +1,51 @@
+{
+  "name": "jira-tracker-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows desktop shell for the Jira Tracker work session app.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.avasoft.jiratracker",
+    "productName": "Jira Tracker",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Jira Tracker"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/packaging/dist/jira-tracker-backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "release"
+    }
+  },
+  "allowScripts": {
+    "electron@32.3.3": true
+  }
+}

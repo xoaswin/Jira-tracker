@@ -69,7 +69,7 @@ already configured for this: `make backend` / `run.sh` pass `--host 0.0.0.0`, an
    argument list and `shell=False`, timeout-guarded, and never raise (they
    degrade to empty results).
 8. **Migrations run automatically on startup** (`app/db_init.py`). Current head:
-   **`d4f6b1a2c8e9`**. Add a migration for any model change.
+   **`f6b8d3e0a2c4`** (day_intentions). Add a migration for any model change.
 
 ## Layout
 
@@ -169,6 +169,42 @@ nudge, dashboard (today + weekly tracked-vs-logged chart + unlogged panel).
 - Direction: wants the app to "think big" and solve multiple real problems, not
   just be a nicer Jira skin. The winning theme is the overlap of **time + git +
   Jira + AI** locally — things no single external tool can do.
+
+## Desktop shell (`desktop/`, Electron on Windows)
+
+An Electron wrapper turns the app into a Windows desktop app. `desktop/main.js`
+spawns the PyInstaller-packaged backend (`backend/packaging/`, built by
+`build_backend.ps1`) on **127.0.0.1:8756**, points the DB/logs at Electron's
+`userData`, shows the full app in a window (hidden to the tray on close), and
+keeps a **system tray** icon alive.
+
+The **nudge system** (the reason this exists) adds three always-on-top windows,
+all rendered from static `desktop/renderer/*.html` via a `preload.js`
+contextBridge. The backend only allows CORS from the Vite origin, so renderers
+never fetch it directly: **every backend call is proxied through the main
+process over IPC** (`status:get`, `intention:get/save/append-note`, plus window
+actions).
+
+- **Floating status pill** (`widget.html`) — frameless/transparent/draggable,
+  `screen-saver` always-on-top level, position persisted to
+  `userData/widget-state.json`. Polls `/api/sessions/active` every 15s and
+  ticks the elapsed timer locally. Buttons: check-in now, open app.
+- **Hourly check-in** (`nudge.html`) — the scheduler (1-min tick) opens it
+  within the work window when `now - lastNudgeAt >= interval`, where interval is
+  `checkin_interval_minutes` or **60** if that's 0 (the web app treats 0 as
+  disabled; the desktop user wants hourly). Active session -> "Still on X?"
+  (Yes / Switch task); no session -> "What are you working on?" with a note box
+  that appends to today's intention, plus Start / Snooze (10m).
+- **Start-of-day plan** (`plan.html`) — prompted once per local date (past
+  `work_start_time`, only if no intention yet), saved to the backend.
+
+Backed by the **`day_intentions`** table (`DayIntention`, migration
+`f6b8d3e0a2c4`): one row per local date (`plan_date` "YYYY-MM-DD"), `note` +
+`ticket_keys`, **decoupled from sessions** so the day's plan/context persists
+and is reusable even when no timer is running. API: `GET/POST
+/api/plan/intention` (in `routers/my_tickets.py`). The in-page `CheckinPrompt`
+suppresses itself in the desktop build (main.js tags the user agent with
+`JiraTrackerDesktop`) so check-ins aren't doubled.
 
 ## Likely next ideas (not yet built)
 

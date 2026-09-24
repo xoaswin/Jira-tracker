@@ -23,21 +23,48 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return Notification.requestPermission();
 }
 
+export type NotifyOutcome = "shown" | "errored" | "not-permitted";
+
+// Reports what actually happened (rather than firing blind) so a caller can
+// surface it: the constructor succeeding does NOT mean the OS displayed
+// anything (e.g. the browser's app is muted in Windows Settings > System >
+// Notifications, or Focus Assist is on) - only the 'show' event confirms
+// that.
 export function notifyDesktop(
   title: string,
   body: string,
   onClick?: () => void,
+  onOutcome?: (outcome: NotifyOutcome, detail?: string) => void,
 ): void {
-  if (!SUPPORTED || Notification.permission !== "granted") return;
-  const n = new Notification(title, {
-    body,
-    // Reuses one OS notification slot instead of stacking a new toast every
-    // interval if a previous one went unseen.
-    tag: "jira-tracker-checkin",
-  });
-  n.onclick = () => {
-    window.focus();
-    onClick?.();
-    n.close();
-  };
+  if (!SUPPORTED || Notification.permission !== "granted") {
+    onOutcome?.("not-permitted");
+    return;
+  }
+  try {
+    const n = new Notification(title, {
+      body,
+      // A shared tag replaces the previous OS entry instead of stacking one
+      // per interval. Combined with requireInteraction, a same-tag
+      // notification can silently update the existing (already-dismissed?
+      // or unseen) entry in the Action Center WITHOUT re-popping a toast -
+      // that's spec-legal browser behaviour, not a bug on our end, but it
+      // means back-to-back calls with an unread predecessor can go visually
+      // unnoticed. Suffixing the tag with a timestamp forces every call to
+      // be a genuinely new entry that always pops.
+      tag: `jira-tracker-checkin-${Date.now()}`,
+      // Windows auto-dismisses a toast after ~5s by default; this pins it in
+      // the Action Center-style tray until you click or dismiss it, so it's
+      // still there when you next look at the screen.
+      requireInteraction: true,
+    });
+    n.onshow = () => onOutcome?.("shown");
+    n.onerror = () => onOutcome?.("errored");
+    n.onclick = () => {
+      window.focus();
+      onClick?.();
+      n.close();
+    };
+  } catch (err) {
+    onOutcome?.("errored", err instanceof Error ? err.message : String(err));
+  }
 }

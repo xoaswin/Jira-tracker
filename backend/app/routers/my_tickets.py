@@ -13,7 +13,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.models import DayIntention
 from app.schemas import (
+    DayIntentionIn,
+    DayIntentionOut,
     DayPlanOut,
     MyTicketOut,
     MyTicketsOut,
@@ -72,3 +75,35 @@ def plan_today(
             for tv in plan.velocity.by_type.values()
         ],
     )
+
+
+# --- start-of-day intention (the user's own plan; no Jira call needed) ---
+#
+# This is deliberately decoupled from sessions and from the live /plan/today
+# ranking: it's what YOU said you'd work on, stored per local date, so the
+# desktop check-in can nudge against it and it survives even when no timer is
+# running.
+
+
+@router.get("/plan/intention", response_model=DayIntentionOut | None)
+def get_intention(
+    date: str = Query(..., description="Local date YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+) -> DayIntention | None:
+    return db.query(DayIntention).filter_by(plan_date=date).one_or_none()
+
+
+@router.post("/plan/intention", response_model=DayIntentionOut)
+def upsert_intention(
+    payload: DayIntentionIn,
+    db: Session = Depends(get_db),
+) -> DayIntention:
+    row = db.query(DayIntention).filter_by(plan_date=payload.plan_date).one_or_none()
+    if row is None:
+        row = DayIntention(plan_date=payload.plan_date)
+        db.add(row)
+    row.note = payload.note
+    row.ticket_keys = payload.ticket_keys
+    db.commit()
+    db.refresh(row)
+    return row

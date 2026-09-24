@@ -10,6 +10,7 @@ import { useAiStatus, useSettings, useUpdateSettings } from "../api/hooks";
 import {
   notificationPermission,
   notificationsSupported,
+  notifyDesktop,
   requestNotificationPermission,
 } from "../lib/notify";
 import { Banner, Button, Card, Label, TextInput } from "./ui";
@@ -36,10 +37,31 @@ export function AISettings() {
   const [apiKey, setApiKey] = useState("");
   const [justSaved, setJustSaved] = useState(false);
   const [notifyPerm, setNotifyPerm] = useState(notificationPermission());
+  const [notifyError, setNotifyError] = useState<string | null>(null);
+  const [testStatus, setTestStatus] = useState<string | null>(null);
+  // Notification permission can only be requested in a secure context: HTTPS,
+  // or exactly http://localhost. A raw IP (e.g. the WSL fallback URL when
+  // localhost port-forwarding is off) is NOT secure, so requestPermission()
+  // silently no-ops there with no browser prompt and no error.
+  const insecureOrigin = !window.isSecureContext;
 
   async function enableNotifications() {
-    const result = await requestNotificationPermission();
-    setNotifyPerm(result);
+    setNotifyError(null);
+    try {
+      const result = await requestNotificationPermission();
+      setNotifyPerm(result);
+      if (result === "default") {
+        setNotifyError(
+          insecureOrigin
+            ? `Your browser silently ignored the request. You're on ${window.location.origin}, which isn't a secure context. Open the app via http://localhost:${window.location.port} instead (not the raw IP address).`
+            : "Your browser didn't show a permission prompt. Check the address bar for a blocked-notifications icon, or check your browser's site settings for this page.",
+        );
+      }
+    } catch (err) {
+      setNotifyError(
+        `Request failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   useEffect(() => {
@@ -279,30 +301,92 @@ export function AISettings() {
         </div>
 
         {checkinInterval > 0 && notificationsSupported() && notifyPerm !== "granted" && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
-            <span className="flex items-center gap-2">
-              <Bell className="h-4 w-4 shrink-0" />
-              {notifyPerm === "denied"
-                ? "Desktop notifications are blocked. Allow them for this site in your browser to get a Windows popup for check-ins."
-                : "Check-ins only show as an in-app modal on this tab. Enable desktop notifications to get a Windows popup even when the tab isn't focused."}
-            </span>
-            {notifyPerm !== "denied" && (
+          <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <Bell className="h-4 w-4 shrink-0" />
+                {notifyPerm === "denied"
+                  ? "Desktop notifications are blocked. Allow them for this site in your browser to get a Windows popup for check-ins."
+                  : "Check-ins only show as an in-app modal on this tab. Enable desktop notifications to get a Windows popup even when the tab isn't focused."}
+              </span>
+              {notifyPerm !== "denied" && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={enableNotifications}
+                >
+                  Enable
+                </Button>
+              )}
+            </div>
+            {insecureOrigin && notifyPerm !== "denied" && (
+              <p className="text-amber-700 dark:text-amber-300">
+                Heads up: you're on {window.location.origin}, not a secure
+                origin. Desktop notifications need HTTPS or exactly
+                http://localhost:{window.location.port || "5173"} — a raw IP
+                address won't work even after clicking Enable.
+              </p>
+            )}
+            {notifyError && <p className="text-rose-600 dark:text-rose-400">{notifyError}</p>}
+          </div>
+        )}
+        {checkinInterval > 0 && notificationsSupported() && notifyPerm === "granted" && (
+          <div className="space-y-2 text-xs text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Desktop notifications are on for check-ins.
+              </span>
               <Button
                 type="button"
                 variant="secondary"
                 className="shrink-0"
-                onClick={enableNotifications}
+                onClick={() => {
+                  setTestStatus("pending");
+                  notifyDesktop(
+                    "Test notification",
+                    "If you can see this outside the browser tab, desktop alerts are working.",
+                    undefined,
+                    (outcome, detail) => setTestStatus(detail ? `${outcome}: ${detail}` : outcome),
+                  );
+                  // The 'show' event doesn't fire on every browser/OS combo
+                  // even when the toast did appear, so don't leave "pending"
+                  // stuck forever if nothing reports back.
+                  window.setTimeout(
+                    () =>
+                      setTestStatus((s) =>
+                        s === "pending"
+                          ? "sent (no confirmation event - check Windows Action Center, Win+N)"
+                          : s,
+                      ),
+                    2000,
+                  );
+                }}
               >
-                Enable
+                Send test
               </Button>
+            </div>
+            {testStatus && (
+              <p
+                className={
+                  testStatus === "shown"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : testStatus === "not-permitted"
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-slate-500 dark:text-slate-400"
+                }
+              >
+                {testStatus === "shown"
+                  ? "Confirmed: the OS reported the toast was displayed."
+                  : testStatus === "not-permitted"
+                    ? "Blocked: permission isn't actually granted for this origin."
+                    : testStatus.startsWith("errored")
+                      ? `Browser error: ${testStatus}`
+                      : `Status: ${testStatus}`}
+              </p>
             )}
           </div>
-        )}
-        {checkinInterval > 0 && notificationsSupported() && notifyPerm === "granted" && (
-          <p className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-            <Bell className="h-4 w-4" />
-            Desktop notifications are on for check-ins.
-          </p>
         )}
 
         <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
