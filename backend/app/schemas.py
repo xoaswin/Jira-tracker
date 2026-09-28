@@ -296,6 +296,7 @@ class SettingsOut(BaseModel):
     work_end_time: str | None = None
     daily_target_hours: float = 0.0
     checkin_interval_minutes: int = 0
+    timezone: str = "Asia/Kolkata"
     auto_actual_dates: bool = False
     # Which issues are cached/searched per board (see ISSUE_SCOPE_JQL).
     issue_scope: str = "open_on_board"
@@ -318,6 +319,7 @@ class SettingsUpdate(BaseModel):
     work_end_time: str | None = None
     daily_target_hours: float | None = None
     checkin_interval_minutes: int | None = None
+    timezone: str | None = None
     auto_actual_dates: bool | None = None
     # Optional: set a third-party AI key (stored in the keychain, not the DB).
     gemini_api_key: str | None = None

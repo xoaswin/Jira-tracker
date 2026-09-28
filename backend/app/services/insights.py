@@ -12,13 +12,16 @@ count toward totals and per-day, grouped as an "untyped"/"no project" bucket.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, tzinfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Issue, WorkSession
 from app.services.duration import effective_duration_seconds
+from app.services.tz import app_tz, local_day
+from app.services.tz import day_bounds as tz_day_bounds
+from app.services.tz import today as local_today
 
 
 @dataclass
@@ -66,6 +69,7 @@ def compute_insights(
     db: Session, start: datetime, end: datetime
 ) -> Insights:
     """Aggregate completed sessions in [start, end] into breakdowns."""
+    tz = app_tz(db)
     # issue_key -> (project_key, issue_type) from the cache.
     meta: dict[str, tuple[str | None, str | None]] = {
         key: (proj, itype)
@@ -111,7 +115,7 @@ def compute_insights(
         else:
             _bump(by_ticket, "(no ticket)", "No ticket", secs, logged)
 
-        day = s.started_at.astimezone(timezone.utc).date().isoformat()
+        day = local_day(s.started_at, tz).isoformat()
         _bump(by_day, day, day, secs, logged)
 
     def _sorted(d: dict[str, Bucket], limit: int | None = None) -> list[Bucket]:
@@ -119,8 +123,8 @@ def compute_insights(
         return items[:limit] if limit else items
 
     return Insights(
-        range_start=start.date().isoformat(),
-        range_end=end.date().isoformat(),
+        range_start=local_day(start, tz).isoformat(),
+        range_end=local_day(end, tz).isoformat(),
         total_tracked_seconds=total_tracked,
         total_logged_seconds=total_logged,
         session_count=len(sessions),
@@ -133,15 +137,15 @@ def compute_insights(
     )
 
 
-def range_from_preset(preset: str, anchor: date | None = None) -> tuple[datetime, datetime]:
-    """Resolve a preset ('week' | 'last_week' | 'month' | '30d') to UTC bounds."""
-    anchor = anchor or datetime.now(timezone.utc).date()
+def range_from_preset(
+    preset: str, tz: tzinfo, anchor: date | None = None
+) -> tuple[datetime, datetime]:
+    """Resolve a preset ('week' | 'last_week' | 'month' | '30d') to UTC bounds
+    of whole days in the user's timezone."""
+    anchor = anchor or local_today(tz)
 
     def day_bounds(a: date, b: date) -> tuple[datetime, datetime]:
-        return (
-            datetime.combine(a, time.min, tzinfo=timezone.utc),
-            datetime.combine(b, time.max, tzinfo=timezone.utc),
-        )
+        return tz_day_bounds(a, b, tz)
 
     if preset == "last_week":
         monday = anchor - timedelta(days=anchor.weekday() + 7)

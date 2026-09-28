@@ -7,27 +7,20 @@ import { CalendarDays, History } from "lucide-react";
 import { useSessionsInRange } from "../api/hooks";
 import type { WorkSession } from "../api/types";
 import { formatDuration, toHours } from "../lib/time";
+import { formatClock, zonedDateStr, zonedWallToMs } from "../lib/tz";
 import { Banner, Button, Card, Label, Spinner, TextInput } from "./ui";
 
-// Local start/end of a YYYY-MM-DD date, as ISO instants for the range query.
+// App-timezone start/end of a YYYY-MM-DD date, as ISO instants for the query.
 function dayBounds(dateStr: string): { from: string; to: string } | null {
-  if (!dateStr) return null;
-  const start = new Date(`${dateStr}T00:00:00`);
-  const end = new Date(`${dateStr}T23:59:59.999`);
-  if (Number.isNaN(start.getTime())) return null;
-  return { from: start.toISOString(), to: end.toISOString() };
-}
-
-function todayStr(): string {
-  const d = new Date();
-  // Local YYYY-MM-DD for the date input default.
-  const off = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - off).toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const start = zonedWallToMs(dateStr);
+  const end = zonedWallToMs(dateStr, 23, 59, 59, 999);
+  return { from: new Date(start).toISOString(), to: new Date(end).toISOString() };
 }
 
 export function SessionHistory() {
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayStr());
+  const [date, setDate] = useState(zonedDateStr());
 
   const bounds = dayBounds(date);
   const q = useSessionsInRange(
@@ -70,7 +63,7 @@ export function SessionHistory() {
               type="date"
               className="pl-9"
               value={date}
-              max={todayStr()}
+              max={zonedDateStr()}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
@@ -103,10 +96,7 @@ export function SessionHistory() {
 }
 
 function HistoryRow({ s }: { s: WorkSession }) {
-  const start = new Date(s.started_at).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const start = formatClock(s.started_at);
   return (
     <li className="flex items-center justify-between gap-3 py-2">
       <div className="min-w-0">

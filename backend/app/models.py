@@ -157,6 +157,9 @@ class AppSettings(Base):
     daily_target_hours: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     # 0 disables the recurring check-in; otherwise minutes between prompts.
     checkin_interval_minutes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # IANA timezone the workday is measured in (see app.services.tz). The work
+    # window above and every "today"/day bucket follow it, not the machine clock.
+    timezone: Mapped[str] = mapped_column(String, default="Asia/Kolkata", nullable=False)
 
     # When true, finishing/logging a session best-effort stamps the ticket's
     # "actual start" (if not already set) and "actual end" date fields from the

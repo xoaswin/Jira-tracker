@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.jira.client import JiraClient
 from app.services.my_tickets import MyTicket, get_my_tickets
+from app.services.tz import app_tz
 from app.services.velocity import Velocity, compute_velocity
 
 # Urgency ordering (lower = do sooner). Mirrors my_tickets buckets.
@@ -85,7 +86,7 @@ def build_day_plan(
     capacity_seconds = max(0, int(capacity_hours * 3600))
     velocity = compute_velocity(db)
 
-    tickets = sorted(get_my_tickets(client), key=_plan_sort_key)
+    tickets = sorted(get_my_tickets(client, tz=app_tz(db)), key=_plan_sort_key)
 
     items: list[PlanItem] = []
     used = 0

@@ -13,6 +13,7 @@ import { useInsights, useReconcile } from "../api/hooks";
 import type { InsightBucket, ReconcileRow } from "../api/types";
 import { useUi } from "../store/ui";
 import { formatDuration, toHours } from "../lib/time";
+import { formatDateKey } from "../lib/tz";
 import { Banner, Button, Card, Spinner } from "../components/ui";
 
 const PRESETS: { key: string; label: string }[] = [
@@ -146,7 +147,7 @@ function DayTrend({ buckets }: { buckets: InsightBucket[] }) {
       <div className="flex items-end gap-1" style={{ height: 96 }}>
         {buckets.map((b) => {
           const h = Math.round((b.tracked_seconds / max) * 88);
-          const day = new Date(`${b.key}T00:00:00`).toLocaleDateString([], {
+          const day = formatDateKey(b.key, {
             weekday: "short",
           });
           return (

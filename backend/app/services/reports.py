@@ -10,13 +10,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import WorkSession
 from app.services.duration import effective_duration_seconds
+from app.services.tz import app_tz, day_bounds, local_day
+from app.services.tz import today as local_today
 
 
 @dataclass
@@ -59,10 +61,10 @@ def _session_seconds(s: WorkSession) -> int:
 
 def week_report(db: Session, anchor: date | None = None) -> WeekReport:
     """Build the tracked-vs-logged report for the week containing ``anchor``."""
-    anchor = anchor or datetime.now(timezone.utc).date()
+    tz = app_tz(db)
+    anchor = anchor or local_today(tz)
     monday, sunday = _week_bounds(anchor)
-    start_dt = datetime.combine(monday, time.min, tzinfo=timezone.utc)
-    end_dt = datetime.combine(sunday, time.max, tzinfo=timezone.utc)
+    start_dt, end_dt = day_bounds(monday, sunday, tz)
 
     stmt = (
         select(WorkSession)
@@ -91,7 +93,7 @@ def week_report(db: Session, anchor: date | None = None) -> WeekReport:
         total_tracked += secs
         total_logged += logged
 
-        day_key = s.started_at.astimezone(timezone.utc).date().isoformat()
+        day_key = local_day(s.started_at, tz).isoformat()
         bucket = days.get(day_key)
         if bucket is not None:
             bucket.tracked_seconds += secs

@@ -25,6 +25,7 @@ import { useUi } from "../store/ui";
 import type { MyTicket, Urgency } from "../api/types";
 import { Banner, Button, Card, Spinner } from "../components/ui";
 import { PlanMyDay } from "../components/PlanMyDay";
+import { formatDateKey } from "../lib/tz";
 
 // Presentation per urgency bucket: label, ordering, and colour.
 const URGENCY: Record<
@@ -68,7 +69,7 @@ const GROUP_ORDER: Urgency[] = [
 
 function dueLabel(t: MyTicket): string {
   if (!t.due_date) return "No due date";
-  const d = new Date(t.due_date).toLocaleDateString();
+  const d = formatDateKey(t.due_date);
   if (t.days_until_due == null) return d;
   if (t.days_until_due < 0) {
     const n = Math.abs(t.days_until_due);

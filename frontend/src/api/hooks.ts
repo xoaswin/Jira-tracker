@@ -266,9 +266,11 @@ export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: api.updateSettings,
-    onSuccess: (data) => {
+    onSuccess: (data, patch) => {
       qc.setQueryData(keys.settings, data);
       qc.invalidateQueries({ queryKey: keys.aiStatus });
+      // A new timezone re-buckets every day-based view (reports, history, ...).
+      if (patch.timezone) qc.invalidateQueries();
     },
   });
 }

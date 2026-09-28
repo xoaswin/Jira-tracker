@@ -26,6 +26,7 @@ from app.schemas import (
 from app.services.connection import build_client
 from app.services.my_tickets import get_my_tickets
 from app.services.planning import build_day_plan
+from app.services.tz import app_tz
 
 router = APIRouter(prefix="/api", tags=["my-tickets"])
 
@@ -33,7 +34,7 @@ router = APIRouter(prefix="/api", tags=["my-tickets"])
 @router.get("/my-tickets", response_model=MyTicketsOut)
 def my_tickets(db: Session = Depends(get_db)) -> MyTicketsOut:
     with build_client(db) as client:
-        tickets = get_my_tickets(client)
+        tickets = get_my_tickets(client, tz=app_tz(db))
     out = [MyTicketOut(**t.__dict__) for t in tickets]
     return MyTicketsOut(
         tickets=out,

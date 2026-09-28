@@ -5,6 +5,14 @@ import { useState } from "react";
 import { Check, Clock } from "lucide-react";
 import { useManualSession } from "../api/hooks";
 import { parseDurationToSeconds } from "../lib/time";
+import { zonedWallToMs } from "../lib/tz";
+
+// "YYYY-MM-DDTHH:MM" (datetime-local) -> ISO instant in the app timezone.
+function wallTimeToIso(value: string): string {
+  const [date, time = "00:00"] = value.split("T");
+  const [h, m] = time.split(":").map(Number);
+  return new Date(zonedWallToMs(date, h || 0, m || 0)).toISOString();
+}
 import { Banner, Button, Card, Label, TextArea, TextInput } from "./ui";
 
 export function ManualEntry() {
@@ -28,9 +36,9 @@ export function ManualEntry() {
         duration_seconds: seconds,
         issue_key: issueKey.trim() || null,
         notes: notes.trim() || null,
-        // datetime-local has no timezone; send as-is and let the server treat it
-        // as the start instant. Omit if not provided.
-        started_at: when ? new Date(when).toISOString() : null,
+        // datetime-local has no timezone: read it as wall time in the app
+        // timezone (IST by default). Omit if not provided.
+        started_at: when ? wallTimeToIso(when) : null,
       },
       {
         onSuccess: () => {

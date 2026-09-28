@@ -35,6 +35,7 @@ try {
     pyinstaller `
         --name jira-tracker-backend `
         --onedir `
+        --noconfirm `
         --noconsole `
         --distpath packaging\dist `
         --workpath packaging\build `
@@ -44,6 +45,7 @@ try {
         --add-data "${FrontendDist};frontend\dist" `
         --hidden-import keyring.backends.Windows `
         --collect-all win32ctypes `
+        --collect-data tzdata `
         --copy-metadata keyring `
         --exclude-module torch `
         --exclude-module sentence_transformers `

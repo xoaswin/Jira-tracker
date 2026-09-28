@@ -24,15 +24,10 @@ import { EditableSession } from "../components/EditableSession";
 import { ManualEntry } from "../components/ManualEntry";
 import { GapDetection } from "../components/GapDetection";
 import { SessionHistory } from "../components/SessionHistory";
+import { zonedDateStr } from "../lib/tz";
 
 function isToday(iso: string): boolean {
-  const d = new Date(iso);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
+  return zonedDateStr(Date.parse(iso)) === zonedDateStr();
 }
 
 function SyncBadge({ s }: { s: WorkSession }) {

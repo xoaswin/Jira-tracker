@@ -35,6 +35,7 @@ import {
 import { ApiError } from "../api/client";
 import type { DateField, ManageView, Subtask } from "../api/types";
 import { formatDuration } from "../lib/time";
+import { formatDate } from "../lib/tz";
 import { Banner, Button, Label, Spinner, TextArea, TextInput } from "./ui";
 
 export function categoryTone(cat: string | null): string {
@@ -443,7 +444,7 @@ function LogWork({ issueKey }: { issueKey: string }) {
                 {w.comment && <span className="ml-2 truncate">{w.comment}</span>}
               </span>
               <span className="shrink-0 whitespace-nowrap text-slate-400">
-                {w.started ? new Date(w.started).toLocaleDateString() : ""}
+                {w.started ? formatDate(w.started) : ""}
                 {w.author ? ` · ${w.author}` : ""}
               </span>
             </li>

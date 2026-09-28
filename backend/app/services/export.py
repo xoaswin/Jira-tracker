@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models import Issue, WorkSession
 from app.services.duration import effective_duration_seconds
+from app.services.tz import app_tz, local_day
 
 
 def backup_db_path() -> str | None:
@@ -51,6 +52,7 @@ def timesheet_csv(db: Session, start: datetime, end: datetime) -> str:
         .order_by(WorkSession.started_at.asc())
     )
 
+    tz = app_tz(db)
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
@@ -70,7 +72,7 @@ def timesheet_csv(db: Session, start: datetime, end: datetime) -> str:
         started = s.started_at.astimezone(timezone.utc)
         writer.writerow(
             [
-                started.date().isoformat(),
+                local_day(started, tz).isoformat(),
                 started.isoformat(),
                 s.issue_key or "",
                 types.get(s.issue_key or "", "") or "",

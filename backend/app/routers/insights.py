@@ -11,7 +11,7 @@ from/to (ISO) or a named preset; preset defaults to the current week.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, PlainTextResponse
@@ -27,12 +27,13 @@ from app.schemas import (
 from app.services.export import backup_db_path, timesheet_csv
 from app.services.insights import compute_insights, range_from_preset
 from app.services.reconcile import reconcile
+from app.services.tz import app_tz
 
 router = APIRouter(prefix="/api", tags=["insights"])
 
 
 def _resolve_range(
-    from_: datetime | None, to: datetime | None, preset: str | None
+    from_: datetime | None, to: datetime | None, preset: str | None, tz: tzinfo
 ) -> tuple[datetime, datetime]:
     """Explicit from/to wins; else a named preset; else the current week."""
     if from_ and to:
@@ -40,7 +41,7 @@ def _resolve_range(
         f = from_ if from_.tzinfo else from_.replace(tzinfo=timezone.utc)
         t = to if to.tzinfo else to.replace(tzinfo=timezone.utc)
         return f, t
-    return range_from_preset(preset or "week")
+    return range_from_preset(preset or "week", tz)
 
 
 def _bucket_out(b) -> InsightBucketOut:
@@ -60,7 +61,7 @@ def insights(
     preset: str | None = None,
     db: Session = Depends(get_db),
 ) -> InsightsOut:
-    start, end = _resolve_range(from_, to, preset)
+    start, end = _resolve_range(from_, to, preset, app_tz(db))
     ins = compute_insights(db, start, end)
     return InsightsOut(
         range_start=ins.range_start,
@@ -83,7 +84,7 @@ def reconcile_route(
     preset: str | None = None,
     db: Session = Depends(get_db),
 ) -> ReconcileOut:
-    start, end = _resolve_range(from_, to, preset)
+    start, end = _resolve_range(from_, to, preset, app_tz(db))
     rows = reconcile(db, start, end)
     return ReconcileOut(
         range_start=start.date().isoformat(),
@@ -119,7 +120,7 @@ def export_timesheet(
     preset: str | None = None,
     db: Session = Depends(get_db),
 ) -> PlainTextResponse:
-    start, end = _resolve_range(from_, to, preset)
+    start, end = _resolve_range(from_, to, preset, app_tz(db))
     csv_text = timesheet_csv(db, start, end)
     fname = f"timesheet_{start.date().isoformat()}_{end.date().isoformat()}.csv"
     return PlainTextResponse(

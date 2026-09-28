@@ -13,6 +13,7 @@ import {
   notifyDesktop,
   requestNotificationPermission,
 } from "../lib/notify";
+import { COMMON_TIMEZONES, isValidTimeZone } from "../lib/tz";
 import { Banner, Button, Card, Label, TextInput } from "./ui";
 
 const THIRD_PARTY = new Set(["gemini", "groq"]);
@@ -33,6 +34,7 @@ export function AISettings() {
   const [workEnd, setWorkEnd] = useState("");
   const [dailyTarget, setDailyTarget] = useState(0);
   const [checkinInterval, setCheckinInterval] = useState(0);
+  const [timeZone, setTimeZone] = useState("Asia/Kolkata");
   const [autoActualDates, setAutoActualDates] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [justSaved, setJustSaved] = useState(false);
@@ -78,6 +80,7 @@ export function AISettings() {
       setWorkEnd(s.work_end_time ?? "");
       setDailyTarget(s.daily_target_hours ?? 0);
       setCheckinInterval(s.checkin_interval_minutes ?? 0);
+      setTimeZone(s.timezone || "Asia/Kolkata");
       setAutoActualDates(s.auto_actual_dates ?? false);
     }
   }, [settings.data]);
@@ -102,6 +105,7 @@ export function AISettings() {
       work_end_time: workEnd || null,
       daily_target_hours: dailyTarget,
       checkin_interval_minutes: checkinInterval,
+      timezone: isValidTimeZone(timeZone) ? timeZone : "Asia/Kolkata",
       auto_actual_dates: autoActualDates,
     };
     if (apiKey.trim()) {
@@ -248,6 +252,27 @@ export function AISettings() {
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           Work day and accountability
         </h3>
+        <div>
+          <Label>Timezone</Label>
+          <select
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+            value={timeZone}
+            onChange={(e) => setTimeZone(e.target.value)}
+          >
+            {(COMMON_TIMEZONES.includes(timeZone)
+              ? COMMON_TIMEZONES
+              : [timeZone, ...COMMON_TIMEZONES]
+            ).map((tz) => (
+              <option key={tz} value={tz}>
+                {tz === "Asia/Kolkata" ? "Asia/Kolkata (IST)" : tz}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-400">
+            Work hours, check-ins, "today" and report days use this zone, not
+            your computer's clock.
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Work start</Label>

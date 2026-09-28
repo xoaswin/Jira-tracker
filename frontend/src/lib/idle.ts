@@ -4,6 +4,7 @@
 // can prompt "keep it, or subtract it?".
 
 import { useEffect, useRef, useState } from "react";
+import { zonedMinutesOfDay } from "./tz";
 
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll"] as const;
 
@@ -59,8 +60,7 @@ export function isPastNudgeTime(nudgeTime: string | null | undefined): boolean {
   if (!nudgeTime) return false;
   const [h, m] = nudgeTime.split(":").map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return false;
-  const now = new Date();
-  return now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m);
+  return zonedMinutesOfDay() >= h * 60 + m;
 }
 
 /** Minutes-since-local-midnight for an "HH:MM" string, or null if unparseable. */
@@ -73,7 +73,7 @@ export function minutesOfDay(hhmm: string | null | undefined): number | null {
 
 /** Local minutes-since-midnight for a given time (defaults to now). */
 export function nowMinutesOfDay(now: Date = new Date()): number {
-  return now.getHours() * 60 + now.getMinutes();
+  return zonedMinutesOfDay(now.getTime());
 }
 
 /**

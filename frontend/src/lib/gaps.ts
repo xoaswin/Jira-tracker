@@ -1,8 +1,9 @@
 // Gap detection: find stretches of the workday that no session covers, so the
-// user can log forgotten time. Pure and timezone-correct by construction: it
-// works entirely in the browser's local time (all Date math is local), because
-// "the workday" is a human, local-clock notion. The backend stores UTC; the
-// sessions we receive carry ISO timestamps that Date parses to local.
+// user can log forgotten time. "The workday" is a human, local-clock notion, so
+// day boundaries use the app timezone (settings.timezone, see ./tz), not UTC and
+// not the machine clock. The backend stores UTC; sessions carry ISO instants.
+
+import { formatClock, startOfZonedDay } from "./tz";
 
 export interface BusyInput {
   started_at: string; // ISO
@@ -35,9 +36,7 @@ const DAY_MS = 86_400_000;
 
 /** Start-of-today (local midnight) in ms for a given now. */
 function startOfLocalDay(nowMs: number): number {
-  const d = new Date(nowMs);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  return startOfZonedDay(nowMs);
 }
 
 /**
@@ -115,8 +114,5 @@ export function isLocalToday(iso: string, nowMs: number = Date.now()): boolean {
 
 /** Format a local ms timestamp as "9:30 AM"-style clock time. */
 export function formatClockTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatClock(ms);
 }

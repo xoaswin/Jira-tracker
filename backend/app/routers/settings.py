@@ -10,13 +10,14 @@ whether each key is present.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.schemas import SettingsOut, SettingsUpdate
 from app.secrets import GEMINI_API_KEY, GROQ_API_KEY, get_secret_store
 from app.services.connection import ensure_settings_row
+from app.services.tz import is_valid_timezone
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -51,6 +52,9 @@ def update_settings_route(
         key = data.pop("groq_api_key")
         if key:
             store.set(GROQ_API_KEY, key)
+
+    if "timezone" in data and not (data["timezone"] and is_valid_timezone(data["timezone"])):
+        raise HTTPException(status_code=422, detail=f"Unknown timezone: {data['timezone']}")
 
     for field, value in data.items():
         setattr(row, field, value)

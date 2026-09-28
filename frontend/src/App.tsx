@@ -9,7 +9,8 @@ import {
   Play,
   Settings as SettingsIcon,
 } from "lucide-react";
-import { useActiveSession, useAuthStatus } from "./api/hooks";
+import { useActiveSession, useAuthStatus, useSettings } from "./api/hooks";
+import { setAppTimeZone } from "./lib/tz";
 import { useUi, type Screen } from "./store/ui";
 import { Spinner } from "./components/ui";
 import { NudgeBanner } from "./components/NudgeBanner";
@@ -60,6 +61,10 @@ function NavButton({
 export default function App() {
   const auth = useAuthStatus();
   const active = useActiveSession();
+  const settings = useSettings();
+  // Set during render (idempotent) so every child computes "today" and clock
+  // times in the configured timezone, not the machine's.
+  setAppTimeZone(settings.data?.timezone);
   const { screen, setScreen, currentSessionId, setCurrentSession } = useUi();
   const autoRouted = useRef(false);
 
@@ -83,7 +88,9 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, active.isSuccess]);
 
-  if (auth.isLoading) {
+  // Wait for settings too: rendering before the timezone is known could pick
+  // the wrong "today" (e.g. an EDT machine vs an IST workday).
+  if (auth.isLoading || settings.isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Spinner />

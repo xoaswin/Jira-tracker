@@ -9,7 +9,7 @@ the raw input when AI is off or unreachable (never raises).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,6 +27,8 @@ from app.config import get_settings
 from app.integrations.git import commits_since, diffstat_since, find_repo_for_issue
 from app.models import WorkSession
 from app.services.duration import effective_duration_seconds
+from app.services.tz import app_tz, day_bounds
+from app.services.tz import today as local_today
 
 
 def cleanup_comment(db: Session, notes: str) -> tuple[str, bool]:
@@ -100,9 +102,9 @@ def _fmt_hms(seconds: int) -> str:
 
 def daily_summary(db: Session, day: date | None = None) -> tuple[str, bool]:
     """Roll up a day's completed sessions into a short standup-style summary."""
-    day = day or datetime.now(timezone.utc).date()
-    start = datetime.combine(day, time.min, tzinfo=timezone.utc)
-    end = datetime.combine(day, time.max, tzinfo=timezone.utc)
+    tz = app_tz(db)
+    day = day or local_today(tz)
+    start, end = day_bounds(day, day, tz)
     stmt = (
         select(WorkSession)
         .where(

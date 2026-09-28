@@ -357,6 +357,8 @@ export interface AppSettingsData {
   work_end_time: string | null;
   daily_target_hours: number;
   checkin_interval_minutes: number;
+  // IANA zone the workday is measured in (default Asia/Kolkata).
+  timezone: string;
   auto_actual_dates: boolean;
   has_gemini_key: boolean;
   has_groq_key: boolean;

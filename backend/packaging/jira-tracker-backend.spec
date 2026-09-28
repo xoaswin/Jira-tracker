@@ -1,10 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.hooks import copy_metadata
 
 datas = [('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/backend/alembic.ini', 'backend'), ('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/backend/alembic', 'backend/alembic'), ('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/frontend/dist', 'frontend/dist')]
 binaries = []
 hiddenimports = ['keyring.backends.Windows']
+datas += collect_data_files('tzdata')
 datas += copy_metadata('keyring')
 tmp_ret = collect_all('win32ctypes')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]

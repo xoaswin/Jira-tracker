@@ -16,7 +16,7 @@ Sorted so the most urgent surface first. Read-only and live; never cached.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, tzinfo
 
 from app.jira.client import JiraClient
 from app.jira.datetime_fmt import parse_jira_datetime
@@ -104,9 +104,12 @@ def _to_ticket(raw: dict, today: date) -> MyTicket:
     )
 
 
-def get_my_tickets(client: JiraClient, *, now: datetime | None = None) -> list[MyTicket]:
-    """Fetch all open tickets assigned to the connected user, urgency-ranked."""
-    today = (now or datetime.now()).date()
+def get_my_tickets(
+    client: JiraClient, *, now: datetime | None = None, tz: tzinfo | None = None
+) -> list[MyTicket]:
+    """Fetch all open tickets assigned to the connected user, urgency-ranked.
+    ``tz`` is the user's timezone, which decides what "due today" means."""
+    today = (now or datetime.now(tz)).date()
     raws = enhanced_search_my_issues(client)
     tickets = [_to_ticket(r, today) for r in raws]
     # Stable sort: urgency bucket first, then soonest due date within a bucket.

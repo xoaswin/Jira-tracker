@@ -17,6 +17,8 @@ dependencies = [
     # These are light and always installed.
     "rank-bm25",
     "numpy",
+    # IANA zone data for zoneinfo: Windows has no system tz database.
+    "tzdata",
 ]
 
 [project.optional-dependencies]
