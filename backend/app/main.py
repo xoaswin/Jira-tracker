@@ -34,6 +34,7 @@ from app.routers import (
     sessions,
     settings as settings_router,
     velocity as velocity_router,
+    wrapup,
 )
 from app.services.connection import NotConnectedError, ensure_settings_row
 from app.sync.poller import run_outbox_poller
@@ -143,6 +144,7 @@ app.include_router(my_tickets.router)
 app.include_router(velocity_router.router)
 app.include_router(insights_router.router)
 app.include_router(assistant.router)
+app.include_router(wrapup.router)
 
 
 # --- Production static serving (single process on 8756) ---

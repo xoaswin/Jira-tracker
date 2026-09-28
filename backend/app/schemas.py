@@ -617,3 +617,50 @@ class OutboxActionResult(BaseModel):
     processed: int = 0
     reason: str | None = None
 
+
+# --- end-of-day wrap-up (desktop) ---
+
+class WrapupSessionOut(BaseModel):
+    id: int
+    issue_key: str | None = None
+    description: str
+    notes: str | None = None
+    seconds: int
+    started_at: str
+    ended_at: str | None = None
+    sync_state: str
+    sync_error: str | None = None
+
+
+class WrapupDayOut(BaseModel):
+    date: str
+    tracked_seconds: int
+    logged_seconds: int
+    target_seconds: int
+    active_session_id: int | None = None
+    active_issue_key: str | None = None
+    sessions: list[WrapupSessionOut] = Field(default_factory=list)
+
+
+class WrapupDraftOut(BaseModel):
+    text: str
+    used_ai: bool
+    source: str  # "git" | "notes" | "none"
+    commit_count: int = 0
+
+
+class WrapupLogItem(BaseModel):
+    session_id: int
+    notes: str | None = None
+    issue_key: str | None = None
+
+
+class WrapupLogRequest(BaseModel):
+    items: list[WrapupLogItem] = Field(default_factory=list)
+
+
+class WrapupLogOutcome(BaseModel):
+    session_id: int
+    ok: bool
+    sync_state: str | None = None
+    message: str

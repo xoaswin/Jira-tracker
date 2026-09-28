@@ -1,0 +1,276 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Wrap up your day</title>
+    <style>
+      /* End-of-day review: today's sessions (app timezone) with an editable
+         worklog comment each (drafted from git commits, else the session's
+         notes), then one button to log every not-yet-logged session. */
+      html, body { margin: 0; height: 100%; }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: #0b0b12;
+        color: #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(139, 92, 246, 0.25);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      #bar {
+        -webkit-app-region: drag;
+        display: flex; align-items: center; gap: 8px;
+        height: 30px; padding: 0 6px 0 12px;
+        font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+        color: #94a3b8;
+        user-select: none;
+      }
+      #bar .logo { width: 12px; height: 12px; border-radius: 4px; background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+      #bar .grow { flex: 1; }
+      #close {
+        -webkit-app-region: no-drag;
+        width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
+        background: transparent; color: #64748b; font-size: 16px; line-height: 24px; cursor: pointer;
+      }
+      #close:hover { background: rgba(255, 255, 255, 0.08); color: #e2e8f0; }
+      header { padding: 4px 18px 12px; }
+      h1 { margin: 0; font-size: 18px; }
+      .totals { margin-top: 4px; font-size: 12.5px; color: #94a3b8; }
+      .meter { margin-top: 8px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+      .meter span { display: block; height: 100%; background: linear-gradient(90deg, #8b5cf6, #22c55e); }
+      .banner {
+        margin: 0 18px 10px; padding: 8px 10px; border-radius: 8px;
+        font-size: 12.5px; background: rgba(245, 158, 11, 0.12); color: #fcd34d;
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      }
+      #list { flex: 1; overflow-y: auto; padding: 0 18px; }
+      .row { border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+      .row.done { opacity: 0.6; }
+      .head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+      .key {
+        font-family: ui-monospace, Consolas, monospace; font-size: 12px; font-weight: 600; color: #c4b5fd;
+        background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 2px 4px; width: 92px;
+      }
+      input.key { border-color: rgba(255, 255, 255, 0.12); color: #e2e8f0; }
+      .desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1; }
+      .dur { font-variant-numeric: tabular-nums; color: #94a3b8; font-size: 12.5px; }
+      .chip { font-size: 11px; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+      .chip.synced { background: rgba(34, 197, 94, 0.14); color: #86efac; }
+      .chip.pending { background: rgba(99, 102, 241, 0.16); color: #a5b4fc; }
+      .chip.todo { background: rgba(245, 158, 11, 0.14); color: #fcd34d; }
+      .chip.error { background: rgba(244, 63, 94, 0.15); color: #fda4af; }
+      textarea {
+        margin-top: 8px; width: 100%; box-sizing: border-box; resize: vertical; min-height: 46px;
+        background: #0f1424; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px;
+        color: #e2e8f0; font: inherit; font-size: 12.5px; padding: 7px 9px;
+      }
+      textarea:focus, input.key:focus { outline: none; border-color: #8b5cf6; }
+      .note { margin-top: 5px; font-size: 11.5px; color: #64748b; }
+      .note.err { color: #fda4af; }
+      .note.ok { color: #86efac; }
+      .empty { padding: 30px 0; text-align: center; color: #94a3b8; font-size: 13px; }
+      footer { display: flex; gap: 8px; padding: 12px 18px 14px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+      footer .grow { flex: 1; }
+      button {
+        padding: 8px 13px; border-radius: 8px; border: 1px solid transparent;
+        font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+      }
+      button:disabled { opacity: 0.55; cursor: default; }
+      .primary { background: #7c3aed; color: #fff; }
+      .primary:hover:not(:disabled) { background: #6d28d9; }
+      .ghost { background: transparent; border-color: #334155; color: #cbd5e1; }
+      .ghost:hover { background: rgba(255, 255, 255, 0.06); }
+    </style>
+  </head>
+  <body>
+    <div id="bar"><span class="logo"></span><span class="grow">End of day</span><button id="close" title="Close">&times;</button></div>
+    <header>
+      <h1>Wrap up your day</h1>
+      <div class="totals" id="totals">Loading today&hellip;</div>
+      <div class="meter" id="meter" hidden><span id="meterFill"></span></div>
+    </header>
+    <div id="active" class="banner" hidden></div>
+    <div id="list"></div>
+    <footer>
+      <button class="ghost" id="openApp">Open app</button>
+      <span class="grow"></span>
+      <button class="ghost" id="later">Later</button>
+      <button class="primary" id="logAll" disabled>Log to Jira</button>
+    </footer>
+
+    <script>
+      const list = document.getElementById("list");
+      const logAll = document.getElementById("logAll");
+      const rows = new Map(); // session id -> { s, el, keyEl, textEl, noteEl, chipEl }
+
+      function fmt(sec) {
+        sec = Math.max(0, Math.floor(sec || 0));
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+        return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+      }
+
+      function el(tag, cls, text) {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+      }
+
+      function chip(state) {
+        if (state === "synced") return ["synced", "Logged"];
+        if (state === "pending") return ["pending", "Queued"];
+        if (state === "error") return ["error", "Failed"];
+        return ["todo", "Not logged"];
+      }
+
+      function setChip(r, state) {
+        const [cls, label] = chip(state);
+        r.chipEl.className = "chip " + cls;
+        r.chipEl.textContent = label;
+      }
+
+      function pendingRows() {
+        return [...rows.values()].filter((r) => r.s.sync_state !== "synced" || r.textEl.value !== (r.s.notes || ""));
+      }
+
+      function refreshButton() {
+        const n = pendingRows().filter((r) => (r.keyEl.value || r.s.issue_key || "").trim()).length;
+        logAll.disabled = n === 0;
+        logAll.textContent = n ? `Log ${n} to Jira` : "Nothing to log";
+      }
+
+      function renderRow(s) {
+        const done = s.sync_state === "synced";
+        const row = el("div", "row" + (done ? " done" : ""));
+        const head = el("div", "head");
+        let keyEl;
+        if (done || s.issue_key) {
+          keyEl = el("span", "key", s.issue_key || "");
+          keyEl.value = s.issue_key || "";
+        } else {
+          keyEl = el("input", "key");
+          keyEl.placeholder = "TICKET-1";
+          keyEl.addEventListener("input", refreshButton);
+        }
+        const desc = el("span", "desc", s.description);
+        desc.title = s.description;
+        const chipEl = el("span", "chip");
+        head.append(keyEl, desc, el("span", "dur", fmt(s.seconds)), chipEl);
+        const textEl = el("textarea");
+        textEl.rows = 2;
+        textEl.placeholder = "Worklog comment (optional)";
+        textEl.value = s.notes || "";
+        textEl.addEventListener("input", refreshButton);
+        const noteEl = el("div", "note" + (s.sync_error && s.sync_state !== "synced" ? " err" : ""),
+          s.sync_state !== "synced" && s.sync_error ? s.sync_error : "");
+        row.append(head, textEl, noteEl);
+        list.appendChild(row);
+        const r = { s, el: row, keyEl, textEl, noteEl, chipEl };
+        setChip(r, s.sync_state);
+        rows.set(s.id, r);
+      }
+
+      // Fill empty comments from git (AI-summarised commits) one at a time, so
+      // the card is usable immediately and the AI isn't hit in parallel.
+      async function draftComments() {
+        for (const r of rows.values()) {
+          if (r.s.sync_state === "synced" || !r.s.issue_key || r.textEl.value.trim()) continue;
+          r.noteEl.className = "note";
+          r.noteEl.textContent = "Drafting from your commits...";
+          let d = null;
+          try {
+            d = await window.desktop.wrapupDraft(r.s.id);
+          } catch (e) {
+            d = null;
+          }
+          if (d && d.source === "git" && d.text && !r.textEl.value.trim()) {
+            r.textEl.value = d.text;
+            r.noteEl.textContent = `Drafted from ${d.commit_count} commit${d.commit_count === 1 ? "" : "s"}${d.used_ai ? " (AI)" : ""}. Edit if needed.`;
+          } else {
+            r.noteEl.textContent = "";
+          }
+        }
+        refreshButton();
+      }
+
+      async function load() {
+        let day = null;
+        try {
+          day = await window.desktop.wrapupGet();
+        } catch (e) {
+          day = null;
+        }
+        if (!day) {
+          document.getElementById("totals").textContent = "Couldn't reach the tracker backend. Try again from the tray in a moment.";
+          return;
+        }
+        const target = day.target_seconds;
+        document.getElementById("totals").textContent =
+          `${fmt(day.tracked_seconds)} tracked` + (target ? ` of ${fmt(target)} target` : "") +
+          ` · ${fmt(day.logged_seconds)} logged to Jira`;
+        if (target) {
+          document.getElementById("meter").hidden = false;
+          document.getElementById("meterFill").style.width = Math.min(100, (day.tracked_seconds / target) * 100) + "%";
+        }
+        if (day.active_session_id) {
+          const b = document.getElementById("active");
+          b.hidden = false;
+          b.textContent = `A timer is still running${day.active_issue_key ? " on " + day.active_issue_key : ""}. Stop it in the app to include it.`;
+        }
+        if (!day.sessions.length) {
+          list.appendChild(el("div", "empty", "No finished sessions today."));
+        }
+        day.sessions.forEach(renderRow);
+        refreshButton();
+        draftComments();
+      }
+
+      logAll.addEventListener("click", async () => {
+        const todo = pendingRows().filter((r) => (r.keyEl.value || r.s.issue_key || "").trim());
+        if (!todo.length) return;
+        logAll.disabled = true;
+        logAll.textContent = "Logging...";
+        const items = todo.map((r) => ({
+          session_id: r.s.id,
+          notes: r.textEl.value,
+          issue_key: r.s.issue_key ? null : r.keyEl.value.trim() || null,
+        }));
+        let results = null;
+        try {
+          results = await window.desktop.wrapupLog(items);
+        } catch (e) {
+          results = null;
+        }
+        if (!results) {
+          logAll.disabled = false;
+          logAll.textContent = "Retry";
+          return;
+        }
+        for (const o of results) {
+          const r = rows.get(o.session_id);
+          if (!r) continue;
+          if (o.sync_state) {
+            r.s.sync_state = o.sync_state;
+            setChip(r, o.sync_state);
+          }
+          if (o.ok) r.s.notes = r.textEl.value;
+          r.noteEl.className = "note " + (o.ok ? "ok" : "err");
+          r.noteEl.textContent = o.message;
+          if (o.sync_state === "synced") r.el.classList.add("done");
+        }
+        refreshButton();
+      });
+
+      document.getElementById("close").addEventListener("click", () => window.desktop.closeWrapup());
+      document.getElementById("later").addEventListener("click", () => window.desktop.closeWrapup());
+      document.getElementById("openApp").addEventListener("click", () => window.desktop.openApp());
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") window.desktop.closeWrapup();
+      });
+
+      load();
+    </script>
+  </body>
+</html>

@@ -41,4 +41,11 @@ contextBridge.exposeInMainWorld("desktop", {
   // Grow the compact check-in card into a chat once the user types.
   expandNudge: () => ipcRenderer.invoke("nudge:expand"),
   closePlan: () => ipcRenderer.invoke("plan:close"),
+
+  // End-of-day wrap-up: today's sessions, a drafted comment per session, and
+  // logging the reviewed sessions to Jira.
+  wrapupGet: () => ipcRenderer.invoke("wrapup:get"),
+  wrapupDraft: (sessionId) => ipcRenderer.invoke("wrapup:draft", sessionId),
+  wrapupLog: (items) => ipcRenderer.invoke("wrapup:log", items),
+  closeWrapup: () => ipcRenderer.invoke("wrapup:close"),
 });

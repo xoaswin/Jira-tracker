@@ -7,7 +7,9 @@
 //   * fires an hourly "still on this?" check-in in a small corner card
 //     (nudge.html) within your work hours, whether or not a timer is running,
 //   * asks for your start-of-day plan (plan.html) and stores it via the backend
-//     so the check-in can nudge you against it and it survives with no timer.
+//     so the check-in can nudge you against it and it survives with no timer,
+//   * at work end shows an end-of-day wrap-up (wrapup.html): today's sessions
+//     with git-drafted worklog comments and one "Log all to Jira" button.
 //
 // The backend only allows CORS from the Vite dev origin, so the small windows
 // never fetch it directly: every backend call is proxied here over IPC.
@@ -61,6 +63,7 @@ let mainWindow = null;
 let widgetWindow = null;
 let nudgeWindow = null;
 let planWindow = null;
+let wrapupWindow = null;
 let tray = null;
 let schedulerTimer = null;
 let settingsTimer = null;
@@ -516,6 +519,37 @@ function openPlanWindow() {
   });
 }
 
+function openWrapupWindow() {
+  if (wrapupWindow) {
+    wrapupWindow.show();
+    wrapupWindow.focus();
+    return;
+  }
+  wrapupWindow = new BrowserWindow({
+    width: 560,
+    height: 600,
+    frame: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: false,
+    alwaysOnTop: true,
+    show: false,
+    icon: path.join(__dirname, "assets", "icon.ico"),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  wrapupWindow.loadFile(path.join(__dirname, "renderer", "wrapup.html"));
+  wrapupWindow.once("ready-to-show", () => wrapupWindow.showInactive());
+  wrapupWindow.on("closed", () => {
+    wrapupWindow = null;
+  });
+}
+
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "tray-icon.ico"));
   tray = new Tray(icon);
@@ -525,6 +559,7 @@ function createTray() {
       { label: "Open Jira Tracker", click: showMainWindow },
       { label: "Check in now", click: openNudgeWindow },
       { label: "Plan my day", click: openPlanWindow },
+      { label: "Wrap up my day", click: openWrapupWindow },
       { type: "separator" },
       {
         label: "Quit",
@@ -564,10 +599,52 @@ async function maybePromptPlan() {
   openPlanWindow();
 }
 
+// Once per date, at/after work end: offer the wrap-up, but only when there is
+// something to do (unlogged sessions, a running timer, or short of target).
+function desktopStatePath() {
+  return path.join(app.getPath("userData"), "desktop-state.json");
+}
+
+function readDesktopState() {
+  try {
+    return JSON.parse(fs.readFileSync(desktopStatePath(), "utf8")) || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDesktopState(patch) {
+  try {
+    fs.writeFileSync(desktopStatePath(), JSON.stringify({ ...readDesktopState(), ...patch }));
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function maybePromptWrapup() {
+  if (wrapupWindow || nudgeWindow || planWindow) return;
+  const s = settingsCache || {};
+  const start = parseHM(s.work_start_time);
+  const end = parseHM(s.work_end_time);
+  if (end == null) return; // no work end configured
+  if (start != null && start > end) return; // overnight shifts: tray only
+  if (nowMinutes() < end) return;
+  const date = localDate();
+  if (readDesktopState().wrapupDate === date) return;
+
+  const day = await apiGet("/api/wrapup/today");
+  if (!day) return; // backend down; try next tick
+  writeDesktopState({ wrapupDate: date }); // at most once per day
+  const unlogged = day.sessions.some((x) => x.sync_state !== "synced");
+  const short = day.target_seconds > 0 && day.tracked_seconds < day.target_seconds;
+  if (unlogged || day.active_session_id || short) openWrapupWindow();
+}
+
 async function schedulerTick() {
   await maybePromptPlan();
+  await maybePromptWrapup();
 
-  if (nudgeWindow || planWindow) return; // one pop-up at a time
+  if (nudgeWindow || planWindow || wrapupWindow) return; // one pop-up at a time
   if (Date.now() < snoozeUntil) return;
   // You're looking at the app (and its timer) already; ask once you leave it.
   if (mainWindowInFront()) return;
@@ -643,6 +720,15 @@ function registerIpc() {
   });
   ipcMain.handle("plan:close", () => {
     if (planWindow) planWindow.close();
+  });
+
+  ipcMain.handle("wrapup:get", () => apiGet("/api/wrapup/today"));
+  ipcMain.handle("wrapup:draft", (_e, sessionId) =>
+    apiPost(`/api/wrapup/draft/${Number(sessionId)}`, {}),
+  );
+  ipcMain.handle("wrapup:log", (_e, items) => apiPost("/api/wrapup/log", { items: items || [] }));
+  ipcMain.handle("wrapup:close", () => {
+    if (wrapupWindow) wrapupWindow.close();
   });
 }
 
