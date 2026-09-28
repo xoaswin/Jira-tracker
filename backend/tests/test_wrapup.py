@@ -121,3 +121,7 @@ def test_log_refuses_to_move_a_synced_worklog(client, ids):
     ]})
     assert r.json()[0]["ok"] is False
 
+
+def test_health_identifies_the_backend(client):
+    body = client.get("/api/health").json()
+    assert body["app"] == "jira-tracker" and body["pid"] == os.getpid()

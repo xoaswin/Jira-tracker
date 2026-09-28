@@ -27,7 +27,7 @@ const {
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 
 const BACKEND_PORT = 8756;
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
@@ -110,6 +110,9 @@ function spawnBackend() {
       DATABASE_URL: `sqlite:///${dbPath}`,
       LOG_DIR: logDir,
       SECRET_BACKEND: "auto",
+      // The backend exits when this pid does, so a crashed or force-killed
+      // shell never leaves an orphan holding the port (app/parent_watch.py).
+      JT_PARENT_PID: String(process.pid),
     },
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -745,6 +748,21 @@ async function isBackendHealthy() {
   }
 }
 
+// A packaged launch holds the single-instance lock, so any backend of ours
+// already on the port is an orphan from a crashed/killed shell (possibly an
+// older build). Stop it by image name (only our own exe) and wait for the port.
+async function replaceStaleBackend() {
+  if (!(await isBackendHealthy())) return;
+  console.warn("[backend] stale backend found on", BACKEND_URL, "- stopping it");
+  await new Promise((resolve) =>
+    execFile("taskkill", ["/F", "/IM", "jira-tracker-backend.exe"], { windowsHide: true }, () => resolve()),
+  );
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline && (await isBackendHealthy())) {
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
 // One instance only: a second launch (Start menu, shortcut, auto-start) would
 // otherwise add a second floating button, tray icon and backend.
 const gotLock = app.requestSingleInstanceLock();
@@ -767,6 +785,7 @@ app.whenReady().then(async () => {
   if (external) {
     console.log("[backend] reusing already-running backend on", BACKEND_URL);
   } else {
+    if (app.isPackaged) await replaceStaleBackend();
     spawnBackend();
   }
   try {

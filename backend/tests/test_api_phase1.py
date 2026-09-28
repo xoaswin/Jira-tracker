@@ -61,7 +61,7 @@ def _connect(client, rmock):
 
 def test_health(client):
     r = client.get("/api/health")
-    assert r.status_code == 200 and r.json() == {"status": "ok"}
+    assert r.status_code == 200 and r.json()["status"] == "ok"
 
 
 def test_connect_invalid_token_surfaces_jira_body(client, rmock):

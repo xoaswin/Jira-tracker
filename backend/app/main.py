@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -20,6 +21,7 @@ from app.config import BACKEND_ROOT, get_settings
 from app.db import SessionLocal
 from app.db_init import run_migrations
 from app.jira.client import JiraError, configure_jira_logging
+from app.parent_watch import watch_parent_process
 from app.routers import (
     assistant,
     auth,
@@ -55,6 +57,9 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     logger.info("jira-tracker backend ready on port %s", settings.app_port)
+    # Desktop build: exit with the Electron shell even if it is killed hard,
+    # so no orphan keeps port 8756 and the DB locked.
+    watch_parent_process()
 
     # Start the background outbox poller (Phase 2 durability). Disabled under
     # pytest, where tests drive the worker explicitly and a background loop would
@@ -128,7 +133,9 @@ async def _jira_error_handler(request: Request, exc: JiraError):
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok"}
+    # pid + app lets the desktop shell recognise (and replace) a stale backend
+    # of ours left on the port, without touching an unrelated process.
+    return {"status": "ok", "app": "jira-tracker", "pid": os.getpid()}
 
 
 app.include_router(auth.router)
