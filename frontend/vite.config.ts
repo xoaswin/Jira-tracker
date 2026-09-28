@@ -12,6 +12,14 @@ export default defineConfig({
     // proxy runs inside WSL, so localhost:8756 there still resolves correctly.
     host: true,
     port: 5173,
+    // The repo lives on a OneDrive-synced Windows drive mounted into WSL
+    // (/mnt/c). Native inotify events are unreliable there, so Vite silently
+    // misses edits and HMR stops updating. Polling makes the watcher reliable
+    // at the cost of a little CPU. Restart the dev server for this to take hold.
+    watch: {
+      usePolling: true,
+      interval: 300,
+    },
     proxy: {
       "/api": "http://localhost:8756",
     },

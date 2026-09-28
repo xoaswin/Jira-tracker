@@ -505,6 +505,47 @@ class DayIntentionOut(BaseModel):
     updated_at: datetime
 
 
+# --- contextual assistant (chat grounded in the user's data, tool-calling) ---
+
+class ChatMessageIn(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class AssistantChatRequest(BaseModel):
+    messages: list[ChatMessageIn] = Field(default_factory=list)
+    # The user's local-day bounds (as instants) and date, so "today" reflects
+    # the local clock (backend TZ is UTC; see PROJECT_CONTEXT rule 4).
+    day_start: datetime | None = None
+    day_end: datetime | None = None
+    local_date: str | None = None
+
+
+class ProposedAction(BaseModel):
+    # One of: start_session | log_worklog | transition_ticket | set_day_plan.
+    type: str
+    args: dict = Field(default_factory=dict)
+    summary: str  # human-readable confirm line
+
+
+class AssistantChatResponse(BaseModel):
+    reply: str
+    used_ai: bool
+    action: ProposedAction | None = None
+
+
+class AssistantActRequest(BaseModel):
+    type: str
+    args: dict = Field(default_factory=dict)
+    local_date: str | None = None  # for set_day_plan
+
+
+class AssistantActResult(BaseModel):
+    ok: bool
+    message: str
+    session_id: int | None = None  # set when a start_session action ran
+
+
 class EstimateOut(BaseModel):
     issue_type: str | None = None
     estimate_seconds: int

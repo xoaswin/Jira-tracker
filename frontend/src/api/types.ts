@@ -174,6 +174,50 @@ export interface AIStatus {
   available: boolean;
 }
 
+// --- start-of-day intention ---
+
+export interface DayIntention {
+  plan_date: string;
+  note: string;
+  ticket_keys: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+// --- contextual assistant ---
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ProposedAction {
+  type: string;
+  args: Record<string, unknown>;
+  summary: string;
+}
+
+export interface AssistantChatResponse {
+  reply: string;
+  used_ai: boolean;
+  action: ProposedAction | null;
+}
+
+export interface AssistantActResult {
+  ok: boolean;
+  message: string;
+  session_id?: number | null;
+}
+
+// A rendered chat turn (shared by the slide-over panel and the Assistant tab).
+export interface AssistantMsg {
+  role: "user" | "assistant";
+  content: string;
+  action?: ProposedAction | null;
+  usedAi?: boolean;
+  system?: boolean; // action-result line, styled differently
+}
+
 // --- ticket management (Manage screen) ---
 
 export interface TransitionOption {

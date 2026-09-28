@@ -7,10 +7,14 @@ import type {
   AITextResponse,
   AppSettingsData,
   AssignableUser,
+  AssistantActResult,
+  AssistantChatResponse,
   AuthStatus,
+  ChatMessage,
   Board,
   CompleteResult,
   CreateIssueResponse,
+  DayIntention,
   DayPlan,
   DraftResponse,
   DraftWorklogResponse,
@@ -250,12 +254,35 @@ export const api = {
       v,
     ),
 
+  // contextual assistant (chat grounded in the user's data; tool-calling)
+  assistantChat: (v: {
+    messages: ChatMessage[];
+    day_start?: string | null;
+    day_end?: string | null;
+    local_date?: string | null;
+  }) => request<AssistantChatResponse>("POST", "/api/assistant/chat", v),
+  // Execute a confirmed assistant action server-side.
+  assistantAct: (v: {
+    type: string;
+    args: Record<string, unknown>;
+    local_date?: string | null;
+  }) => request<AssistantActResult>("POST", "/api/assistant/act", v),
+
   // my tickets (assigned to me, due-date attention)
   myTickets: () => request<MyTickets>("GET", "/api/my-tickets"),
 
   // plan my day (ranked + fitted to capacity, learned velocity)
   planToday: (capacityHours: number) =>
     request<DayPlan>("GET", `/api/plan/today?capacity_hours=${capacityHours}`),
+
+  // start-of-day intention (the user's own plan for a local date)
+  dayIntention: (date: string) =>
+    request<DayIntention | null>(
+      "GET",
+      `/api/plan/intention?date=${encodeURIComponent(date)}`,
+    ),
+  setDayIntention: (v: { plan_date: string; note: string; ticket_keys: string[] }) =>
+    request<DayIntention>("POST", "/api/plan/intention", v),
 
   // velocity estimate for an issue type (mid-session over-budget warning)
   estimate: (issueType: string | null) =>

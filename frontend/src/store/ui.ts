@@ -3,6 +3,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { AssistantMsg } from "../api/types";
 
 export type Screen =
   | "start"
@@ -13,6 +14,7 @@ export type Screen =
   | "mytickets"
   | "manage"
   | "insights"
+  | "assistant"
   | "settings";
 
 interface UiState {
@@ -39,6 +41,11 @@ interface UiState {
   // Whether the command palette overlay is open (driven by "/" or the header
   // button). In the store so any component can toggle it without window events.
   commandOpen: boolean;
+  // Whether the assistant chat slide-over is open.
+  assistantOpen: boolean;
+  // Shared conversation, so the quick slide-over panel and the full Assistant
+  // tab show one continuous chat. Not persisted (fresh each app launch).
+  assistantMessages: AssistantMsg[];
 
   setScreen: (s: Screen) => void;
   setSelectedBoard: (id: number | null) => void;
@@ -52,6 +59,10 @@ interface UiState {
   openInManage: (key: string) => void;
   setPlanCapacityHours: (hours: number) => void;
   setCommandOpen: (open: boolean) => void;
+  setAssistantOpen: (open: boolean) => void;
+  setAssistantMessages: (
+    updater: AssistantMsg[] | ((prev: AssistantMsg[]) => AssistantMsg[]),
+  ) => void;
   reset: () => void;
 }
 
@@ -69,6 +80,8 @@ export const useUi = create<UiState>()(
       manageOpenKey: null,
       planCapacityHours: 6,
       commandOpen: false,
+      assistantOpen: false,
+      assistantMessages: [],
 
       setScreen: (screen) => set({ screen }),
       setSelectedBoard: (selectedBoardId) => set({ selectedBoardId }),
@@ -82,6 +95,12 @@ export const useUi = create<UiState>()(
       openInManage: (key) => set({ manageOpenKey: key, screen: "manage" }),
       setPlanCapacityHours: (planCapacityHours) => set({ planCapacityHours }),
       setCommandOpen: (commandOpen) => set({ commandOpen }),
+      setAssistantOpen: (assistantOpen) => set({ assistantOpen }),
+      setAssistantMessages: (updater) =>
+        set((s) => ({
+          assistantMessages:
+            typeof updater === "function" ? updater(s.assistantMessages) : updater,
+        })),
       reset: () =>
         set({
           screen: "start",

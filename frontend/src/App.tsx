@@ -6,8 +6,10 @@ import {
   Command as CommandIcon,
   LayoutDashboard,
   ListChecks,
+  CircleCheckBig as AppMark,
   Play,
   Settings as SettingsIcon,
+  Sparkles,
 } from "lucide-react";
 import { useActiveSession, useAuthStatus, useSettings } from "./api/hooks";
 import { setAppTimeZone } from "./lib/tz";
@@ -27,6 +29,8 @@ import { MyTickets } from "./screens/MyTickets";
 import { Manage } from "./screens/Manage";
 import { Insights } from "./screens/Insights";
 import { CommandPalette } from "./components/CommandPalette";
+import { AssistantPanel } from "./components/AssistantPanel";
+import { Assistant } from "./screens/Assistant";
 
 function NavButton({
   active,
@@ -45,10 +49,10 @@ function NavButton({
     <button
       onClick={onClick}
       title={title}
-      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium transition-all duration-150 ${
         active
-          ? "bg-indigo-600 text-white shadow-sm"
-          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          ? "bg-violet-600 text-white shadow-sm"
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
       }`}
     >
       {icon}
@@ -121,6 +125,11 @@ export default function App() {
       icon: <BarChart3 className="h-4 w-4" />,
     },
     {
+      key: "assistant",
+      label: "Assistant",
+      icon: <Sparkles className="h-4 w-4" />,
+    },
+    {
       key: "settings",
       label: "Settings",
       icon: <SettingsIcon className="h-4 w-4" />,
@@ -146,6 +155,8 @@ export default function App() {
         return <Manage />;
       case "insights":
         return <Insights />;
+      case "assistant":
+        return <Assistant />;
       case "settings":
         return <Settings />;
       default:
@@ -162,16 +173,20 @@ export default function App() {
       {connected && <IdlePrompt />}
       {connected && <CheckinPrompt />}
       {connected && <CommandPalette />}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+      {connected && <AssistantPanel />}
+      <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl dark:border-white/[0.06] dark:bg-[#08080c]/70">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5">
-          <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={`inline-flex h-2 w-2 shrink-0 rounded-full ${
-                connected ? "bg-emerald-500" : "bg-rose-500"
-              }`}
-              title={connected ? "Connected to Jira" : "Not connected"}
-            />
-            <span className="whitespace-nowrap text-sm font-semibold tracking-tight">
+          <div className="flex shrink-0 items-center gap-2.5">
+            <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg shadow-indigo-900/30 ring-1 ring-inset ring-white/20">
+              <AppMark className="h-4 w-4" strokeWidth={2.5} />
+              <span
+                className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-[#08080c] ${
+                  connected ? "bg-emerald-500" : "bg-rose-500"
+                }`}
+                title={connected ? "Connected to Jira" : "Not connected"}
+              />
+            </span>
+            <span className="hidden whitespace-nowrap text-sm font-semibold tracking-tight sm:inline">
               Work Session Tracker
             </span>
           </div>
@@ -180,10 +195,10 @@ export default function App() {
               <button
                 onClick={() => setScreen("active")}
                 title="Active session"
-                className={`mr-1 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                className={`mr-1 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium transition-all duration-150 ${
                   screen === "active"
                     ? "bg-emerald-600 text-white shadow-sm"
-                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
                 }`}
               >
                 <Circle className="h-2 w-2 animate-pulse fill-current" />
@@ -202,9 +217,18 @@ export default function App() {
             ))}
             {connected && (
               <button
+                onClick={() => useUi.getState().setAssistantOpen(true)}
+                title="Quick chat with the assistant"
+                className="ml-1.5 inline-flex shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/15 to-indigo-500/15 p-1.5 text-violet-600 ring-1 ring-inset ring-violet-500/25 transition-colors hover:from-violet-500/25 hover:to-indigo-500/25 dark:text-violet-300"
+              >
+                <Sparkles className="h-4 w-4" />
+              </button>
+            )}
+            {connected && (
+              <button
                 onClick={() => useUi.getState().setCommandOpen(true)}
                 title="Command palette (press / )"
-                className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                className="ml-1.5 inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:border-white/10 dark:hover:bg-white/5 dark:hover:text-slate-200"
               >
                 <CommandIcon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">/</span>

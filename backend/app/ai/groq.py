@@ -46,6 +46,43 @@ class GroqProvider:
             return ""
         return (choices[0].get("message") or {}).get("content", "").strip()
 
+    def chat(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        max_tokens: int = 700,
+    ) -> dict:
+        """Multi-turn chat with optional tool-calling (assistant feature).
+
+        Unlike ``generate`` (a single system+user turn for the narrow "improve
+        wording" helpers), this passes a full ``messages`` array and, when
+        ``tools`` are given, lets the model return ``tool_calls`` so the app can
+        propose an action. Returns a plain dict ``{content, tool_calls}``;
+        ``app.ai.chat.safe_chat`` normalises and timeout-guards it.
+        """
+        body: dict = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+        }
+        if tools:
+            body["tools"] = tools
+            body["tool_choice"] = "auto"
+        resp = httpx.post(
+            _URL,
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            json=body,
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return {"content": "", "tool_calls": []}
+        # Return the raw assistant message so tool_call ids survive: the agentic
+        # loop must echo this message back and answer each call by id.
+        return choices[0].get("message") or {"content": "", "tool_calls": []}
+
     def is_available(self) -> bool:
         """Verify the key is valid AND the configured model exists/is accessible,
         so the UI status reflects whether generation will actually work (not just

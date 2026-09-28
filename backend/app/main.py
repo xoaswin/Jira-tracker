@@ -22,6 +22,7 @@ from app.db import SessionLocal
 from app.db_init import run_migrations
 from app.jira.client import JiraError, configure_jira_logging
 from app.routers import (
+    assistant,
     auth,
     boards,
     insights as insights_router,
@@ -142,6 +143,7 @@ app.include_router(manage.router)
 app.include_router(my_tickets.router)
 app.include_router(velocity_router.router)
 app.include_router(insights_router.router)
+app.include_router(assistant.router)
 
 
 # --- Production static serving (single process on 8756) ---
