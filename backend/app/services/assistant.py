@@ -444,7 +444,7 @@ def run_read_tool(name: str, args: dict, db: Session, req: AssistantChatRequest)
 
         if name == "get_ticket":
             with build_client(db) as client:
-                return _json(asdict(get_manage_view(client, str(args["issue_key"]))))
+                return _json(asdict(get_manage_view(client, str(args["issue_key"]), app_tz(db))))
 
         if name == "get_ticket_worklogs":
             with build_client(db) as client:

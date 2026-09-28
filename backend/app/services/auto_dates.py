@@ -17,12 +17,19 @@ write, we log and move on. AI-free, Jira-only.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 
 from app.jira.client import JiraClient, JiraError
 from app.jira.editmeta import get_editable_date_fields, update_issue_fields
 
 logger = logging.getLogger("jira_tracker.auto_dates")
+
+
+def _in_zone(dt: datetime, tz: tzinfo | None) -> datetime:
+    """A stored (UTC, possibly naive) datetime as wall time in ``tz``."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(tz) if tz else dt
 
 # Name fragments (lowercased) that identify the two fields. Jira instances name
 # these variously ("Start date", "Actual start", "Actual start date", ...).
@@ -59,13 +66,17 @@ def apply_actual_dates(
     *,
     started_at: datetime,
     ended_at: datetime | None,
+    tz: tzinfo | None = None,
 ) -> dict[str, str]:
     """Best-effort set actual start/end on ``issue_key``. Returns fields written.
 
     Never raises. ``started_at``/``ended_at`` are the session's UTC datetimes;
-    the editmeta field type decides date-vs-datetime formatting (handled by
-    update_issue_fields).
+    they are written in ``tz`` (the user's working timezone, IST by default) so
+    a date field gets the IST day and a datetime field an IST (+0530) time. The
+    editmeta field type decides date-vs-datetime formatting.
     """
+    started_at = _in_zone(started_at, tz)
+    ended_at = _in_zone(ended_at, tz) if ended_at is not None else None
     try:
         date_fields = get_editable_date_fields(client, issue_key)
     except JiraError as exc:
@@ -98,7 +109,7 @@ def apply_actual_dates(
         return {}
 
     try:
-        update_issue_fields(client, issue_key, values, editable=date_fields)
+        update_issue_fields(client, issue_key, values, editable=date_fields, tz=tz)
         logger.info("auto-dates: set %s on %s", list(values.keys()), issue_key)
         return values
     except JiraError as exc:

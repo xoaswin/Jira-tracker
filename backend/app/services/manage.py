@@ -18,12 +18,18 @@ And the mutations:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
+
+from dateutil.parser import isoparse
 
 from app.jira.adf import flatten_adf
 from app.jira.client import JiraClient
-from app.jira.datetime_fmt import parse_jira_datetime
-from app.jira.editmeta import EditableField, get_editable_date_fields, update_issue_fields
+from app.jira.editmeta import (
+    EditableField,
+    display_value,
+    get_editable_date_fields,
+    update_issue_fields,
+)
 from app.jira.transitions import get_transitions, walk_to_status
 from app.jira.worklogs import add_worklog, get_worklogs, normalize_time_spent
 from app.sync.idempotency import find_recent_duplicate_worklog
@@ -57,17 +63,21 @@ class ManageView:
     subtasks: list[SubtaskView] = field(default_factory=list)
 
 
-def _date_field_view(f: EditableField, current: dict) -> dict:
+def _date_field_view(f: EditableField, current: dict, tz: tzinfo | None) -> dict:
     return {
         "field_id": f.field_id,
         "name": f.name,
         "schema_type": f.schema_type,
-        "value": current.get(f.field_id),
+        # Datetimes as wall time in the user's zone, not Jira's profile zone.
+        "value": display_value(f, current.get(f.field_id), tz),
     }
 
 
-def get_manage_view(client: JiraClient, issue_key: str) -> ManageView:
-    """Fetch the full manageable view for a ticket."""
+def get_manage_view(
+    client: JiraClient, issue_key: str, tz: tzinfo | None = None
+) -> ManageView:
+    """Fetch the full manageable view for a ticket. ``tz`` is the user's
+    working timezone, used to present datetime fields."""
     # Include the editable date field ids so we can show their current values.
     date_fields = get_editable_date_fields(client, issue_key)
     date_ids = [f.field_id for f in date_fields]
@@ -113,14 +123,20 @@ def get_manage_view(client: JiraClient, issue_key: str) -> ManageView:
         priority_id=str(priority["id"]) if priority.get("id") is not None else None,
         priority_name=priority.get("name"),
         available_transitions=transitions,
-        date_fields=[_date_field_view(f, fields) for f in date_fields],
+        date_fields=[_date_field_view(f, fields, tz) for f in date_fields],
         subtasks=subtasks,
     )
 
 
-def edit_dates(client: JiraClient, issue_key: str, values: dict[str, str | None]) -> None:
-    """Update editable date fields on the ticket."""
-    update_issue_fields(client, issue_key, values)
+def edit_dates(
+    client: JiraClient,
+    issue_key: str,
+    values: dict[str, str | None],
+    tz: tzinfo | None = None,
+) -> None:
+    """Update editable date fields on the ticket. Datetime inputs (no offset)
+    are wall time in ``tz``."""
+    update_issue_fields(client, issue_key, values, tz=tz)
 
 
 def all_subtasks_done(client: JiraClient, issue_key: str) -> tuple[bool, list[SubtaskView]]:
@@ -229,11 +245,13 @@ def log_work(
     started: str | None,
     comment: str | None,
     account_id: str | None = None,
+    tz: tzinfo | None = None,
 ) -> tuple[dict, bool]:
     """Post a worklog to a ticket. Returns (created_worklog, rounded_up).
 
     Total time is hours*3600 + minutes*60. ``started`` is an ISO string from the
-    UI (assumed local/naive -> UTC) or None for now. Raises NoTimeError if the
+    UI (a naive datetime-local value is wall time in ``tz``, the user's working
+    timezone) or None for now. Raises NoTimeError if the
     total is zero, so the UI can show a clear message instead of a Jira 400.
 
     Idempotency: Jira worklog creation has no idempotency key, and this path
@@ -247,7 +265,12 @@ def log_work(
     if total_seconds <= 0:
         raise NoTimeError("Enter a duration greater than zero.")
 
-    when = parse_jira_datetime(started) if started else datetime.now(timezone.utc)
+    if started:
+        when = isoparse(started)
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=tz or timezone.utc)
+    else:
+        when = datetime.now(timezone.utc)
     send_seconds, rounded_up = normalize_time_spent(total_seconds)
 
     existing_id = find_recent_duplicate_worklog(

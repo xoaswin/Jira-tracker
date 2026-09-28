@@ -41,6 +41,7 @@ def _maybe_stamp_actual_dates(db: Session, session: WorkSession) -> None:
     try:
         from app.services.auto_dates import apply_actual_dates
         from app.services.connection import build_client
+        from app.services.tz import app_tz
 
         with build_client(db) as client:
             apply_actual_dates(
@@ -48,6 +49,7 @@ def _maybe_stamp_actual_dates(db: Session, session: WorkSession) -> None:
                 session.issue_key,
                 started_at=session.started_at,
                 ended_at=session.ended_at,
+                tz=app_tz(db),
             )
     except Exception:  # noqa: BLE001 - never let this break completion
         logger.info("auto-dates stamping skipped for session %s", session.id, exc_info=True)

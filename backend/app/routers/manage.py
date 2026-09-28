@@ -49,6 +49,7 @@ from app.services.manage import (
     mark_done,
     transition_subtask,
 )
+from app.services.tz import app_tz
 
 router = APIRouter(prefix="/api/manage", tags=["manage"])
 
@@ -73,7 +74,7 @@ def _view_out(view) -> ManageViewOut:
 @router.get("/{issue_key}", response_model=ManageViewOut)
 def manage_view(issue_key: str, db: Session = Depends(get_db)) -> ManageViewOut:
     with build_client(db) as client:
-        return _view_out(get_manage_view(client, issue_key))
+        return _view_out(get_manage_view(client, issue_key, app_tz(db)))
 
 
 @router.patch("/{issue_key}/dates", response_model=ManageViewOut)
@@ -81,8 +82,8 @@ def edit_dates_route(
     issue_key: str, req: EditDatesRequest, db: Session = Depends(get_db)
 ) -> ManageViewOut:
     with build_client(db) as client:
-        edit_dates(client, issue_key, req.values)
-        return _view_out(get_manage_view(client, issue_key))
+        edit_dates(client, issue_key, req.values, app_tz(db))
+        return _view_out(get_manage_view(client, issue_key, app_tz(db)))
 
 
 @router.post("/{issue_key}/transition", response_model=TransitionResult)
@@ -91,7 +92,7 @@ def transition_route(
 ) -> TransitionResult:
     with build_client(db) as client:
         applied = walk_to_status(client, issue_key, req.target)
-        return TransitionResult(applied=applied, view=_view_out(get_manage_view(client, issue_key)))
+        return TransitionResult(applied=applied, view=_view_out(get_manage_view(client, issue_key, app_tz(db))))
 
 
 @router.post("/{issue_key}/done", response_model=TransitionResult)
@@ -108,7 +109,7 @@ def done_route(issue_key: str, db: Session = Depends(get_db)) -> TransitionResul
                     "code": "subtasks_incomplete",
                 },
             ) from exc
-        return TransitionResult(applied=applied, view=_view_out(get_manage_view(client, issue_key)))
+        return TransitionResult(applied=applied, view=_view_out(get_manage_view(client, issue_key, app_tz(db))))
 
 
 @router.post("/{issue_key}/subtasks/{subtask_key}/transition", response_model=TransitionResult)
@@ -122,7 +123,7 @@ def subtask_transition_route(
         applied = transition_subtask(client, subtask_key, req.target)
         # Return the PARENT view so the UI can refresh subtask states + the
         # parent's Done-button gating in one round trip.
-        return TransitionResult(applied=applied, view=_view_out(get_manage_view(client, issue_key)))
+        return TransitionResult(applied=applied, view=_view_out(get_manage_view(client, issue_key, app_tz(db))))
 
 
 @router.get("/{issue_key}/worklogs", response_model=list[WorklogEntryOut])
@@ -149,6 +150,7 @@ def add_worklog_route(
                 started=req.started,
                 comment=req.comment,
                 account_id=account_id,
+                tz=app_tz(db),
             )
         except NoTimeError as exc:
             raise HTTPException(
@@ -184,7 +186,7 @@ def set_assignee_route(
 ) -> ManageViewOut:
     with build_client(db) as client:
         set_assignee(client, issue_key, req.account_id)
-        return _view_out(get_manage_view(client, issue_key))
+        return _view_out(get_manage_view(client, issue_key, app_tz(db)))
 
 
 @router.put("/{issue_key}/priority", response_model=ManageViewOut)
@@ -193,7 +195,7 @@ def set_priority_route(
 ) -> ManageViewOut:
     with build_client(db) as client:
         set_priority(client, issue_key, req.priority_id)
-        return _view_out(get_manage_view(client, issue_key))
+        return _view_out(get_manage_view(client, issue_key, app_tz(db)))
 
 
 @router.post("/{issue_key}/subtasks", response_model=ManageViewOut)
@@ -209,4 +211,4 @@ def create_subtask_route(
             raise HTTPException(
                 status_code=400, detail={"message": str(exc), "code": "subtask_create"}
             ) from exc
-        return _view_out(get_manage_view(client, issue_key))
+        return _view_out(get_manage_view(client, issue_key, app_tz(db)))
