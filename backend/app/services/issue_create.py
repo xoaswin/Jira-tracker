@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.jira.client import JiraClient
 from app.jira.create_issue import create_issue, fetch_issue
 from app.jira.issues import normalize_issue
-from app.models import Board, Issue, utcnow
+from app.models import Issue, utcnow
 from app.services.matching import ensure_embeddings
 
 logger = logging.getLogger("jira_tracker.issue_create")

@@ -27,8 +27,7 @@ from app.config import get_settings
 from app.integrations.git import commits_since, diffstat_since, find_repo_for_issue
 from app.models import WorkSession
 from app.services.duration import effective_duration_seconds
-from app.services.tz import app_tz, day_bounds
-from app.services.tz import today as local_today
+from app.services.tz import app_tz, day_bounds, today as local_today
 
 
 def cleanup_comment(db: Session, notes: str) -> tuple[str, bool]:

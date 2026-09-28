@@ -47,9 +47,8 @@ from app.services.manage import (
 from app.services.my_tickets import get_my_tickets
 from app.services.planning import build_day_plan
 from app.services.reports import week_report
+from app.services.tz import app_tz, day_bounds, today as local_today
 from app.services.velocity import compute_velocity
-from app.services.tz import app_tz, day_bounds
-from app.services.tz import today as local_today
 
 logger = logging.getLogger("jira_tracker.assistant")
 
@@ -580,10 +579,13 @@ def execute_action(db: Session, atype: str, args: dict, local_date: str | None =
                 description=str(a.get("description") or "Work session"),
                 board_id=None, started_at=utcnow(), state="active", paused_seconds=0,
             )
-            db.add(s); db.commit(); db.refresh(s)
             key = a.get("issue_key")
             if key:
-                s.issue_key = str(key); s.issue_origin = "manual"; db.commit(); db.refresh(s)
+                s.issue_key = str(key)
+                s.issue_origin = "manual"
+            db.add(s)
+            db.commit()
+            db.refresh(s)
             return {"ok": True, "session_id": s.id,
                     "message": "Started a timer" + (f" on {key}" if key else "") + "."}
 
@@ -591,7 +593,8 @@ def execute_action(db: Session, atype: str, args: dict, local_date: str | None =
             plan_date = local_date or local_today(app_tz(db)).isoformat()
             row = db.query(DayIntention).filter_by(plan_date=plan_date).one_or_none()
             if row is None:
-                row = DayIntention(plan_date=plan_date); db.add(row)
+                row = DayIntention(plan_date=plan_date)
+                db.add(row)
             row.note = str(a.get("note") or "")
             row.ticket_keys = [str(k) for k in (a.get("ticket_keys") or [])]
             db.commit()

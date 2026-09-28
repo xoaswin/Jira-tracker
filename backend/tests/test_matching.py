@@ -10,7 +10,6 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 
 from app.integrations.git import (
-    ISSUE_KEY_RE,
     _branch_to_words,
     extract_issue_key,
 )

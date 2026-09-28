@@ -12,7 +12,6 @@ from app.services.drafting import (
     decide_issue_type,
 )
 
-
 # --- story vs subtask decision rule (section 5.5) ---
 
 def test_explicit_subtask_of_in_text_wins():

@@ -19,9 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Issue, WorkSession
 from app.services.duration import effective_duration_seconds
-from app.services.tz import app_tz, local_day
-from app.services.tz import day_bounds as tz_day_bounds
-from app.services.tz import today as local_today
+from app.services.tz import app_tz, day_bounds as tz_day_bounds, local_day, today as local_today
 
 
 @dataclass

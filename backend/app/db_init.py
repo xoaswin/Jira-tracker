@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 
-from alembic import command
 from alembic.config import Config
 
+from alembic import command
 from app.config import BACKEND_ROOT, get_settings
 
 logger = logging.getLogger("jira_tracker.db_init")

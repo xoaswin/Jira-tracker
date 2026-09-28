@@ -3,11 +3,9 @@ subtask-block rule. The client is a lightweight fake (no network); the exact
 Jira request/response shapes are asserted at the API layer in test_api_manage.py.
 """
 
-import pytest
 
-from app.jira.editmeta import EditableField, _format_value
 from app.jira import transitions as tr
-
+from app.jira.editmeta import EditableField, _format_value
 
 # --- editmeta value formatting ---
 

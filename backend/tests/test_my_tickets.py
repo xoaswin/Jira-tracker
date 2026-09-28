@@ -4,7 +4,6 @@ from datetime import date
 
 from app.services.my_tickets import _classify
 
-
 TODAY = date(2026, 9, 18)
 
 

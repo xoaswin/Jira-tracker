@@ -10,9 +10,9 @@ account id stays for the "is this mine?" comparison against the connected user.
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'c3e5a9b8d1f2'

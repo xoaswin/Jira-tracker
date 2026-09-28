@@ -6,7 +6,6 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 # --- auth ---
 
 class ConnectRequest(BaseModel):
@@ -617,3 +616,4 @@ class OutboxActionResult(BaseModel):
     item: OutboxItemOut | None = None
     processed: int = 0
     reason: str | None = None
+

@@ -15,6 +15,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.jira.people import (
+    list_priorities,
+    search_assignable_users,
+    set_assignee,
+    set_priority,
+)
+from app.jira.transitions import walk_to_status
 from app.schemas import (
     AddWorklogRequest,
     AddWorklogResult,
@@ -42,13 +49,6 @@ from app.services.manage import (
     mark_done,
     transition_subtask,
 )
-from app.jira.people import (
-    list_priorities,
-    search_assignable_users,
-    set_assignee,
-    set_priority,
-)
-from app.jira.transitions import walk_to_status
 
 router = APIRouter(prefix="/api/manage", tags=["manage"])
 

@@ -23,7 +23,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, UTCDateTime
 
-
 # Alias so column definitions read naturally while using the UTC-normalising type.
 DateTime = UTCDateTime
 

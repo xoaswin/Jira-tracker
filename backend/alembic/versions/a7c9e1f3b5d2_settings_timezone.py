@@ -9,9 +9,9 @@ window and check-ins follow it instead of the machine clock. Defaults to IST.
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'a7c9e1f3b5d2'

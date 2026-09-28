@@ -9,9 +9,9 @@ the work session's dates on finish, so the user never hand-edits them.
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'e5a7c2d9f1b3'

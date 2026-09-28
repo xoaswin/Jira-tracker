@@ -135,7 +135,7 @@ def ensure_embeddings(db: Session, issues: list[Issue], model_name: str) -> int:
     if vectors is None:  # model became unavailable between the check and here
         return 0
 
-    for issue, vec in zip(stale, vectors):
+    for issue, vec in zip(stale, vectors, strict=True):
         issue.embedding = serialize(vec)
         issue.embedding_model = model_name
     db.commit()

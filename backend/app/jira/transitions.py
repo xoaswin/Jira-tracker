@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from app.jira.client import JiraClient, JiraError
+from app.jira.client import JiraClient
 
 logger = logging.getLogger("jira_tracker.transitions")
 

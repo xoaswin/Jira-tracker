@@ -5,18 +5,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db import get_db
 from app.jira.client import JiraClient, JiraError
 from app.schemas import AuthStatus, ConnectRequest
 from app.secrets import get_secret_store
 from app.services.connection import (
+    clear_connection,
     ensure_settings_row,
     get_settings_row,
     get_token,
     save_connection,
     store_token,
-    clear_connection,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])

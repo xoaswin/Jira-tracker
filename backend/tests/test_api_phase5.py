@@ -7,7 +7,7 @@ so every AI route must degrade to raw text with used_ai=False and never hang.
 
 import os
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 
 _TMP = tempfile.mkdtemp(prefix="jt-p5-")

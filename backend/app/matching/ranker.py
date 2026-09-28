@@ -23,8 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-import numpy as np
-
+from app.integrations.git import extract_issue_key
 from app.matching.bm25 import bm25_scores
 from app.matching.embeddings import (
     cosine_similarity,
@@ -32,7 +31,6 @@ from app.matching.embeddings import (
     embed_text,
     embeddings_available,
 )
-from app.integrations.git import extract_issue_key
 
 # Base signal weights (section 6). Sum to 1.0.
 W_BM25 = 0.4

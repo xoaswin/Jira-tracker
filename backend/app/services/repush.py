@@ -21,8 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.jira.client import JiraError
-from app.jira.worklogs import normalize_time_spent, update_worklog
 from app.jira.comments import add_comment
+from app.jira.worklogs import normalize_time_spent, update_worklog
 from app.models import Outbox, WorkSession
 from app.services.connection import build_client, get_settings_row
 from app.services.duration import effective_duration_seconds

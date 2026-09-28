@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "respx", "pytest-asyncio"]
+test = ["pytest", "respx", "pytest-asyncio", "ruff"]
 # Phase 3 semantic matching (optional). sentence-transformers pulls in torch,
 # which is large; the app is fully usable without it (BM25 + recency), and the
 # ranker redistributes weights when embeddings are absent. Install with a
@@ -40,3 +40,19 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Real-bug rules: pyflakes (unused/undefined names), pycodestyle errors,
+# import order, and bugbear. Long lines are left to judgement (URLs, JQL).
+select = ["F", "E", "W", "I", "B"]
+ignore = [
+    "E501",  # line length
+    "B008",  # FastAPI's Depends()/Query() defaults are the idiom
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true

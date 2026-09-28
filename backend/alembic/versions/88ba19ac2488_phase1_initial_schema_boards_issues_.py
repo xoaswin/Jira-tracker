@@ -1,15 +1,15 @@
 """phase1 initial schema: boards issues sessions settings
 
 Revision ID: 88ba19ac2488
-Revises: 
+Revises:
 Create Date: 2026-09-09 03:07:48.193338
 
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '88ba19ac2488'

@@ -16,9 +16,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TMP}/test.db"
 os.environ["SECRET_BACKEND"] = "file"
 os.environ["LOG_DIR"] = f"{_TMP}/logs"
 
-import httpx  # noqa: E402
 import pytest  # noqa: E402
-import respx  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.db import SessionLocal, reset_engine_for_tests  # noqa: E402

@@ -13,9 +13,9 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.jira.worklogs import normalize_time_spent
 from app.models import Outbox, WorkSession, utcnow
 from app.services.duration import effective_duration_seconds
-from app.jira.worklogs import normalize_time_spent
 
 
 @dataclass

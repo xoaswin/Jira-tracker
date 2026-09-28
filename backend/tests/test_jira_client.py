@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from app.jira.client import JiraError, JiraClient, _redact
+from app.jira.client import JiraError, _redact
 from tests.conftest import BASE_URL, EMAIL, TOKEN
 
 
