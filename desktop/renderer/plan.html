@@ -48,7 +48,7 @@
       textarea { resize: none; margin: 0 0 14px; }
       input { margin: 0 0 4px; }
       .hint { font-size: 11px; color: #64748b; margin: 0 0 16px; }
-      textarea:focus, input:focus { outline: none; border-color: #6366f1; }
+      textarea:focus, input:focus { outline: none; border-color: #8b5cf6; }
       .row { display: flex; gap: 8px; margin-top: auto; }
       button {
         -webkit-app-region: no-drag;
@@ -61,8 +61,12 @@
         font-weight: 600;
         cursor: pointer;
       }
-      .primary { background: #6366f1; color: #fff; }
-      .primary:hover { background: #4f46e5; }
+      .primary {
+        background: rgba(139, 92, 246, 0.18);
+        color: #c4b5fd;
+        border: 1px solid rgba(139, 92, 246, 0.4);
+      }
+      .primary:hover { background: rgba(139, 92, 246, 0.28); }
       .ghost { background: transparent; border-color: #334155; color: #cbd5e1; }
       .ghost:hover { background: #1e293b; }
     </style>
@@ -90,22 +94,19 @@
       const noteEl = document.getElementById("note");
       const keysEl = document.getElementById("keys");
 
-      function localDate() {
-        const d = new Date();
-        const p = (n) => String(n).padStart(2, "0");
-        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-      }
-
-      (function greet() {
-        const h = new Date().getHours();
-        const g = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-        document.getElementById("greeting").textContent = g + " — plan your day";
-      })();
+      // "Today" and the greeting come from the main process, which uses the
+      // configured timezone (IST by default), not this machine's clock.
+      let planDate = null;
 
       // Prefill if a plan already exists for today (re-opened from the tray).
       (async function prefill() {
         try {
-          const existing = await window.desktop.getIntention(localDate());
+          const status = await window.desktop.getStatus();
+          planDate = status.date;
+          const h = status.hour;
+          const g = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+          document.getElementById("greeting").textContent = g + ", plan your day";
+          const existing = await window.desktop.getIntention(planDate);
           if (existing) {
             noteEl.value = existing.note || "";
             keysEl.value = (existing.ticket_keys || []).join(", ");
@@ -123,7 +124,7 @@
           .filter(Boolean);
         try {
           await window.desktop.saveIntention({
-            plan_date: localDate(),
+            plan_date: planDate,
             note: noteEl.value.trim(),
             ticket_keys: keys,
           });

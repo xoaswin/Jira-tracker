@@ -19,12 +19,26 @@ contextBridge.exposeInMainWorld("desktop", {
   // gets captured as reusable context even when no timer is running.
   appendNote: (text) => ipcRenderer.invoke("intention:append-note", text),
 
+  // Contextual assistant: chat (returns {reply, used_ai, action}) and execute a
+  // confirmed action, for the conversational nudge.
+  assistantChat: (messages) => ipcRenderer.invoke("assistant:chat", messages),
+  assistantAct: (action) => ipcRenderer.invoke("assistant:act", action),
+
   // Window actions.
   openApp: () => ipcRenderer.invoke("app:open"),
   triggerNudge: () => ipcRenderer.invoke("nudge:trigger"),
+
+  // Manual drag of the round floating widget.
+  widgetDragStart: () => ipcRenderer.invoke("widget:drag-start"),
+  widgetDragMove: (dx, dy) => ipcRenderer.invoke("widget:drag-move", dx, dy),
+  widgetDragEnd: () => ipcRenderer.invoke("widget:drag-end"),
   // Records that the check-in was answered (resets the hourly interval) and
   // closes the nudge window.
   answerCheckin: () => ipcRenderer.invoke("checkin:answer"),
   snoozeNudge: () => ipcRenderer.invoke("nudge:snooze"),
+  // Close the check-in without answering (it re-asks after the interval).
+  dismissNudge: () => ipcRenderer.invoke("nudge:dismiss"),
+  // Grow the compact check-in card into a chat once the user types.
+  expandNudge: () => ipcRenderer.invoke("nudge:expand"),
   closePlan: () => ipcRenderer.invoke("plan:close"),
 });

@@ -1,9 +1,11 @@
 // Electron shell for the desktop build. It:
 //   * spawns the PyInstaller-packaged backend as a child process,
 //   * shows the full app in a normal window (hidden to the tray on close),
-//   * keeps an always-on-top floating status pill (widget.html) alive,
-//   * fires an hourly "still on this?" check-in in a small pop-up (nudge.html)
-//     within your work hours, whether or not a timer is running,
+//   * runs as a single instance (a second launch just focuses the first),
+//   * shows an always-on-top floating button (widget.html) only while the main
+//     window is NOT in front of you (hidden when it's focused on screen),
+//   * fires an hourly "still on this?" check-in in a small corner card
+//     (nudge.html) within your work hours, whether or not a timer is running,
 //   * asks for your start-of-day plan (plan.html) and stores it via the backend
 //     so the check-in can nudge you against it and it survives with no timer.
 //
@@ -39,8 +41,16 @@ const DEFAULT_INTERVAL_MIN = 60;
 const SNOOZE_MS = 10 * 60_000;
 const SETTINGS_REFRESH_MS = 5 * 60_000;
 
-const WIDGET_W = 240;
-const WIDGET_H = 52;
+// Small square window holding a single round floating button.
+const WIDGET_W = 44;
+const WIDGET_H = 44;
+
+// Check-in card: compact by default (status line + quick buttons), grows only
+// when the user starts chatting with the assistant.
+const NUDGE_W = 360;
+const NUDGE_H = 196;
+const NUDGE_CHAT_H = 460;
+const CORNER_MARGIN = 16;
 
 // Must match build.appId in package.json, or packaged Windows toast
 // notifications can be mis-branded/unreliable.
@@ -61,6 +71,8 @@ let lastNudgeAt = Date.now();
 let snoozeUntil = 0;
 let settingsCache = null;
 let lastPlanPromptDate = null;
+// Window position when a manual widget drag began (renderer sends screen deltas).
+let widgetDragOrigin = null;
 
 // ---------------------------------------------------------------------------
 // Backend process
@@ -156,9 +168,59 @@ async function apiPost(pathname, body) {
   }
 }
 
-function localDate(d = new Date()) {
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+async function apiPatch(pathname, body) {
+  try {
+    const res = await fetch(`${BACKEND_URL}${pathname}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// The workday follows settings.timezone (IST by default), never the machine
+// clock: the laptop may be set to another zone while Jira work is tracked in IST.
+const DEFAULT_TZ = "Asia/Kolkata";
+
+function appTz() {
+  const tz = settingsCache && settingsCache.timezone;
+  try {
+    if (tz) {
+      new Intl.DateTimeFormat("en-US", { timeZone: tz });
+      return tz;
+    }
+  } catch {
+    /* invalid zone: fall through */
+  }
+  return DEFAULT_TZ;
+}
+
+function zonedParts(ms = Date.now()) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: appTz(),
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const out = {};
+  for (const p of fmt.formatToParts(new Date(ms))) {
+    if (p.type !== "literal") out[p.type] = Number(p.value);
+  }
+  return out;
+}
+
+function localDate(ms = Date.now()) {
+  const p = zonedParts(ms);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
 }
 
 // The status snapshot the widget and nudge render from.
@@ -166,12 +228,13 @@ async function composeStatus() {
   const auth = await apiGet("/api/auth/status");
   const connected = !!(auth && auth.connected);
   const date = localDate();
-  if (!connected) return { connected, session: null, intention: null, date };
+  const hour = zonedParts().hour;
+  if (!connected) return { connected, session: null, intention: null, date, hour };
   const [session, intention] = await Promise.all([
     apiGet("/api/sessions/active"),
     apiGet(`/api/plan/intention?date=${date}`),
   ]);
-  return { connected, session: session || null, intention: intention || null, date };
+  return { connected, session: session || null, intention: intention || null, date, hour };
 }
 
 async function appendNote(text) {
@@ -182,8 +245,48 @@ async function appendNote(text) {
   return apiPost("/api/plan/intention", { plan_date: date, note, ticket_keys });
 }
 
+// Start of today in the app timezone, as instants for the assistant.
+function dayBounds() {
+  const now = Date.now();
+  const p = zonedParts(now);
+  const sinceMidnightMs = ((p.hour * 60 + p.minute) * 60 + p.second) * 1000 + (now % 1000);
+  return {
+    day_start: new Date(now - sinceMidnightMs).toISOString(),
+    day_end: new Date(now).toISOString(),
+  };
+}
+
+// Proxy the contextual assistant for the conversational nudge. Returns the
+// backend's {reply, used_ai, action} (or a safe fallback shape on error).
+async function assistantChat(messages) {
+  const b = dayBounds();
+  const res = await apiPost("/api/assistant/chat", {
+    messages,
+    day_start: b.day_start,
+    day_end: b.day_end,
+    local_date: localDate(),
+  });
+  return res || { reply: "", used_ai: false, action: null };
+}
+
+// Execute a confirmed assistant action via the centralized backend endpoint
+// (handles every action type + name->id resolution). Returns a result string.
+async function assistantAct(action) {
+  if (!action) return "Nothing to do.";
+  const res = await apiPost("/api/assistant/act", {
+    type: action.type,
+    args: action.args || {},
+    local_date: localDate(),
+  });
+  if (res && res.ok) {
+    if (action.type === "start_session") showMainWindow();
+    return res.message || "Done.";
+  }
+  return (res && res.message) || "Could not complete that.";
+}
+
 // ---------------------------------------------------------------------------
-// Work-window helpers (local clock, mirroring the web app's lib/idle)
+// Work-window helpers (app timezone, mirroring the web app's lib/idle)
 // ---------------------------------------------------------------------------
 
 function parseHM(hm) {
@@ -193,8 +296,8 @@ function parseHM(hm) {
 }
 
 function nowMinutes() {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
+  const p = zonedParts();
+  return p.hour * 60 + p.minute;
 }
 
 function isWithinWorkWindow(start, end) {
@@ -268,6 +371,33 @@ function createMainWindow() {
       mainWindow.hide();
     }
   });
+
+  // The floating button is a shortcut back to the app, so it's pointless (and
+  // cluttering) while the app itself is in front of you.
+  for (const ev of ["show", "hide", "minimize", "restore", "focus"]) {
+    mainWindow.on(ev, syncWidgetVisibility);
+  }
+  // Debounced: blur fires before the next window takes focus.
+  mainWindow.on("blur", () => setTimeout(syncWidgetVisibility, 150));
+}
+
+function mainWindowInFront() {
+  return (
+    !!mainWindow &&
+    !mainWindow.isDestroyed() &&
+    mainWindow.isVisible() &&
+    !mainWindow.isMinimized() &&
+    mainWindow.isFocused()
+  );
+}
+
+function syncWidgetVisibility() {
+  if (!widgetWindow || widgetWindow.isDestroyed()) return;
+  if (mainWindowInFront()) {
+    if (widgetWindow.isVisible()) widgetWindow.hide();
+  } else if (!widgetWindow.isVisible()) {
+    widgetWindow.showInactive();
+  }
 }
 
 function showMainWindow() {
@@ -294,6 +424,7 @@ function createWidgetWindow() {
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -301,6 +432,7 @@ function createWidgetWindow() {
     },
   });
   widgetWindow.setAlwaysOnTop(true, "screen-saver");
+  widgetWindow.once("ready-to-show", syncWidgetVisibility);
   widgetWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   widgetWindow.loadFile(path.join(__dirname, "renderer", "widget.html"));
   widgetWindow.on("moved", saveWidgetPosition);
@@ -315,15 +447,19 @@ function openNudgeWindow() {
     nudgeWindow.focus();
     return;
   }
+  const wa = screen.getPrimaryDisplay().workArea;
   nudgeWindow = new BrowserWindow({
-    width: 400,
-    height: 330,
+    width: NUDGE_W,
+    height: NUDGE_H,
+    // Bottom-right corner, like a notification, not the middle of the screen.
+    x: wa.x + wa.width - NUDGE_W - CORNER_MARGIN,
+    y: wa.y + wa.height - NUDGE_H - CORNER_MARGIN,
     frame: false,
     resizable: false,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    skipTaskbar: false,
+    skipTaskbar: true,
     alwaysOnTop: true,
     show: false,
     icon: path.join(__dirname, "assets", "icon.ico"),
@@ -335,10 +471,8 @@ function openNudgeWindow() {
   });
   nudgeWindow.setAlwaysOnTop(true, "screen-saver");
   nudgeWindow.loadFile(path.join(__dirname, "renderer", "nudge.html"));
-  nudgeWindow.once("ready-to-show", () => {
-    nudgeWindow.show();
-    nudgeWindow.focus();
-  });
+  // showInactive: don't steal focus from whatever you're typing in.
+  nudgeWindow.once("ready-to-show", () => nudgeWindow.showInactive());
   nudgeWindow.on("closed", () => {
     nudgeWindow = null;
     // Any dismissal (answer/snooze/OS close) restarts the interval clock, so an
@@ -433,8 +567,10 @@ async function maybePromptPlan() {
 async function schedulerTick() {
   await maybePromptPlan();
 
-  if (nudgeWindow) return; // one at a time
+  if (nudgeWindow || planWindow) return; // one pop-up at a time
   if (Date.now() < snoozeUntil) return;
+  // You're looking at the app (and its timer) already; ask once you leave it.
+  if (mainWindowInFront()) return;
   const s = settingsCache || {};
   if (!isWithinWorkWindow(s.work_start_time, s.work_end_time)) return;
   if ((Date.now() - lastNudgeAt) / 60000 < checkinIntervalMin()) return;
@@ -454,9 +590,28 @@ function registerIpc() {
     apiGet(`/api/plan/intention?date=${date || localDate()}`),
   );
   ipcMain.handle("intention:save", (_e, payload) =>
-    apiPost("/api/plan/intention", payload),
+    apiPost("/api/plan/intention", { ...payload, plan_date: (payload && payload.plan_date) || localDate() }),
   );
   ipcMain.handle("intention:append-note", (_e, text) => appendNote(text));
+  ipcMain.handle("assistant:chat", (_e, messages) => assistantChat(messages || []));
+  ipcMain.handle("assistant:act", (_e, action) => assistantAct(action));
+
+  // Manual drag for the round widget (renderer distinguishes drag from click).
+  ipcMain.handle("widget:drag-start", () => {
+    if (widgetWindow) widgetDragOrigin = widgetWindow.getPosition();
+  });
+  ipcMain.handle("widget:drag-move", (_e, dx, dy) => {
+    if (widgetWindow && widgetDragOrigin) {
+      widgetWindow.setPosition(
+        widgetDragOrigin[0] + Math.round(dx),
+        widgetDragOrigin[1] + Math.round(dy),
+      );
+    }
+  });
+  ipcMain.handle("widget:drag-end", () => {
+    widgetDragOrigin = null;
+    saveWidgetPosition();
+  });
 
   ipcMain.handle("app:open", () => {
     showMainWindow();
@@ -468,6 +623,18 @@ function registerIpc() {
   ipcMain.handle("checkin:answer", () => {
     lastNudgeAt = Date.now();
     snoozeUntil = 0;
+    if (nudgeWindow) nudgeWindow.close();
+  });
+  ipcMain.handle("nudge:expand", () => {
+    if (!nudgeWindow) return;
+    const [x, y] = nudgeWindow.getPosition();
+    const [, h] = nudgeWindow.getSize();
+    if (h >= NUDGE_CHAT_H) return;
+    // Grow upward so the card stays anchored to the bottom corner.
+    nudgeWindow.setBounds({ x, y: y - (NUDGE_CHAT_H - h), width: NUDGE_W, height: NUDGE_CHAT_H });
+    nudgeWindow.focus();
+  });
+  ipcMain.handle("nudge:dismiss", () => {
     if (nudgeWindow) nudgeWindow.close();
   });
   ipcMain.handle("nudge:snooze", () => {
@@ -483,9 +650,39 @@ function registerIpc() {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+async function isBackendHealthy() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/health`);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// One instance only: a second launch (Start menu, shortcut, auto-start) would
+// otherwise add a second floating button, tray icon and backend.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => showMainWindow());
+}
+
 app.whenReady().then(async () => {
+  if (!gotLock) return;
   registerIpc();
-  spawnBackend();
+  // In dev (unpackaged), if a backend is already serving 8756 (e.g. `make dev`
+  // in WSL, reachable from Windows via localhost forwarding), reuse it instead
+  // of spawning the bundled PyInstaller exe. That exe can be stale between
+  // rebuilds, and reusing the live dev backend means code changes show up in the
+  // desktop app immediately with no re-freeze. Packaged builds always spawn
+  // their bundled backend (nothing else is running).
+  const external = !app.isPackaged && (await isBackendHealthy());
+  if (external) {
+    console.log("[backend] reusing already-running backend on", BACKEND_URL);
+  } else {
+    spawnBackend();
+  }
   try {
     await waitForHealth();
   } catch (err) {

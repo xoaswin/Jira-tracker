@@ -5,97 +5,162 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
     <title>Check in</title>
     <style>
+      /* A compact corner card: one status line + quick buttons, shown
+         instantly with no AI round-trip. Typing a reply grows it into a chat
+         with the assistant (main process resizes the window upward). */
       html, body { margin: 0; height: 100%; }
       body {
         font-family: "Segoe UI", system-ui, sans-serif;
-        background: #0f172a;
+        background: #0b0b12;
         color: #e2e8f0;
         display: flex;
         flex-direction: column;
-        border: 1px solid #1e293b;
+        border: 1px solid rgba(139, 92, 246, 0.25);
         border-radius: 12px;
         overflow: hidden;
         user-select: none;
       }
       #bar {
         -webkit-app-region: drag;
-        height: 30px;
         display: flex;
         align-items: center;
-        padding: 0 12px;
+        gap: 8px;
+        height: 30px;
+        padding: 0 6px 0 12px;
         font-size: 11px;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: #64748b;
-        border-bottom: 1px solid #1e293b;
-      }
-      main { padding: 16px 20px 20px; flex: 1; display: flex; flex-direction: column; }
-      h1 { font-size: 17px; margin: 0 0 6px; }
-      p { font-size: 13px; color: #cbd5e1; margin: 0 0 12px; line-height: 1.45; }
-      .key { font-family: "Cascadia Code", ui-monospace, monospace; font-weight: 600; color: #a5b4fc; }
-      .plan {
-        font-size: 12px;
         color: #94a3b8;
-        background: #111c33;
-        border: 1px solid #1e293b;
-        border-radius: 8px;
-        padding: 8px 10px;
-        margin: 0 0 12px;
-        max-height: 66px;
-        overflow: auto;
-        white-space: pre-wrap;
       }
-      .plan b { color: #cbd5e1; font-weight: 600; }
-      textarea {
-        width: 100%;
-        box-sizing: border-box;
-        resize: none;
-        background: #0b1424;
-        border: 1px solid #1e293b;
-        border-radius: 8px;
-        color: #e2e8f0;
-        font: inherit;
-        font-size: 13px;
-        padding: 8px 10px;
-        margin: 0 0 12px;
+      #bar .logo {
+        width: 12px; height: 12px; border-radius: 4px;
+        background: linear-gradient(135deg, #8b5cf6, #6366f1);
       }
-      textarea:focus { outline: none; border-color: #6366f1; }
-      .row { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
-      button {
+      #bar .grow { flex: 1; }
+      #close {
         -webkit-app-region: no-drag;
+        width: 24px; height: 24px; padding: 0;
+        border: 0; border-radius: 6px;
+        background: transparent; color: #64748b;
+        font-size: 16px; line-height: 24px; cursor: pointer;
+      }
+      #close:hover { background: rgba(255, 255, 255, 0.08); color: #e2e8f0; }
+      #headline {
+        padding: 2px 14px 12px;
+        font-size: 14px;
+        line-height: 1.4;
+        font-weight: 600;
+      }
+      #headline .sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: #94a3b8; }
+      #msgs {
         flex: 1;
-        min-width: 120px;
-        padding: 9px 12px;
+        overflow-y: auto;
+        padding: 0 14px 10px;
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        user-select: text;
+      }
+      body.chat #msgs { display: flex; }
+      .bubble {
+        max-width: 86%;
+        padding: 8px 11px;
+        border-radius: 14px;
+        font-size: 13px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .assistant { align-self: flex-start; background: rgba(255, 255, 255, 0.06); color: #e2e8f0; }
+      .user { align-self: flex-end; background: #7c3aed; color: #fff; }
+      .system { align-self: flex-start; background: rgba(16, 185, 129, 0.12); color: #6ee7b7; font-size: 12px; }
+      .action {
+        align-self: flex-start;
+        max-width: 92%;
+        border: 1px solid rgba(139, 92, 246, 0.35);
+        border-radius: 12px;
+        padding: 10px;
+        background: rgba(139, 92, 246, 0.08);
+      }
+      .action .sum { font-size: 12.5px; color: #ddd6fe; margin-bottom: 8px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      #quick { padding: 0 14px 10px; }
+      button {
+        padding: 7px 12px;
         border-radius: 8px;
         border: 1px solid transparent;
         font: inherit;
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 600;
         cursor: pointer;
       }
-      .primary { background: #6366f1; color: #fff; }
-      .primary:hover { background: #4f46e5; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      .primary { background: rgba(139, 92, 246, 0.18); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.4); }
+      .primary:hover { background: rgba(139, 92, 246, 0.28); }
       .ghost { background: transparent; border-color: #334155; color: #cbd5e1; }
-      .ghost:hover { background: #1e293b; }
-      .hidden { display: none !important; }
+      .ghost:hover { background: rgba(255, 255, 255, 0.06); }
+      #composer {
+        display: flex; gap: 8px; align-items: flex-end;
+        padding: 8px 12px 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      textarea {
+        flex: 1;
+        resize: none;
+        max-height: 90px;
+        min-height: 18px;
+        background: #0f1424;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        color: #e2e8f0;
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 10px;
+      }
+      textarea:focus { outline: none; border-color: #8b5cf6; }
+      .send { padding: 7px 11px; }
     </style>
   </head>
   <body>
-    <div id="bar">Jira Tracker &middot; check-in</div>
-    <main>
-      <h1 id="title">Checking in…</h1>
-      <p id="body"></p>
-      <div id="plan" class="plan hidden"></div>
-      <textarea id="note" class="hidden" rows="2" placeholder="What are you working on? (saved as today's note)"></textarea>
-      <div class="row" id="buttons"></div>
-    </main>
+    <div id="bar">
+      <span class="logo"></span><span class="grow">Check-in</span>
+      <button id="close" title="Dismiss">&times;</button>
+    </div>
+
+    <div id="headline">Checking in&hellip;</div>
+    <div id="quick"></div>
+    <div id="msgs"></div>
+
+    <div id="composer">
+      <textarea id="reply" rows="1" placeholder="Or tell me what you're doing..."></textarea>
+      <button class="primary send" id="sendBtn" title="Send">&#10148;</button>
+    </div>
 
     <script>
-      const titleEl = document.getElementById("title");
-      const bodyEl = document.getElementById("body");
-      const planEl = document.getElementById("plan");
-      const noteEl = document.getElementById("note");
-      const buttons = document.getElementById("buttons");
+      const headline = document.getElementById("headline");
+      const msgs = document.getElementById("msgs");
+      const quick = document.getElementById("quick");
+      const replyEl = document.getElementById("reply");
+
+      // Assistant history; the first turn gives it the check-in context.
+      const history = [];
+      let status = null;
+
+      function fmtElapsed(sec) {
+        sec = Math.max(0, Math.floor(sec || 0));
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+        return h ? `${h}h ${m}m` : `${m}m`;
+      }
+
+      function setHeadline(main, sub) {
+        headline.textContent = main;
+        if (sub) {
+          const s = document.createElement("span");
+          s.className = "sub";
+          s.textContent = sub;
+          headline.appendChild(s);
+        }
+      }
 
       function btn(label, cls, onClick) {
         const b = document.createElement("button");
@@ -105,71 +170,121 @@
         return b;
       }
 
-      function showPlan(intention) {
-        if (intention && (intention.note || (intention.ticket_keys || []).length)) {
-          const keys = (intention.ticket_keys || []).join(", ");
-          planEl.innerHTML =
-            "<b>Today's plan:</b> " +
-            (intention.note ? escapeHtml(intention.note) : "") +
-            (keys ? " [" + escapeHtml(keys) + "]" : "");
-          planEl.classList.remove("hidden");
-        }
+      function bubble(role, text) {
+        const el = document.createElement("div");
+        el.className = "bubble " + role;
+        el.textContent = text;
+        msgs.appendChild(el);
+        msgs.scrollTop = msgs.scrollHeight;
+        return el;
       }
 
-      function escapeHtml(s) {
-        return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      function renderAction(action) {
+        const wrap = document.createElement("div");
+        wrap.className = "action";
+        const sum = document.createElement("div");
+        sum.className = "sum";
+        sum.textContent = action.summary;
+        const row = document.createElement("div");
+        row.className = "row";
+        const confirm = btn("Confirm", "primary", async () => {
+          confirm.disabled = true;
+          confirm.textContent = "Working...";
+          let result;
+          try {
+            result = await window.desktop.assistantAct(action);
+          } catch (e) {
+            result = "Could not complete that.";
+          }
+          wrap.remove();
+          bubble("system", result || "Done.");
+        });
+        row.appendChild(confirm);
+        row.appendChild(btn("Cancel", "ghost", () => wrap.remove()));
+        wrap.appendChild(sum);
+        wrap.appendChild(row);
+        msgs.appendChild(wrap);
+        msgs.scrollTop = msgs.scrollHeight;
       }
 
+      // Instant, no-AI content from the current status.
       async function init() {
-        let status;
         try {
           status = await window.desktop.getStatus();
         } catch (e) {
           status = null;
         }
-        const session = status && status.session;
-        showPlan(status && status.intention);
-
-        if (session) {
-          const key = session.issue_key || session.description || "this session";
-          titleEl.textContent = "Still on this?";
-          bodyEl.innerHTML =
-            "You're tracking <span class='key'>" +
-            escapeHtml(key) +
-            "</span>" +
-            (session.issue_key && session.description ? " &mdash; " + escapeHtml(session.description) : "") +
-            ". Is that still what you're working on?";
-          buttons.appendChild(
-            btn("Yes, still on it", "primary", () => window.desktop.answerCheckin()),
+        const s = status && status.session;
+        const row = document.createElement("div");
+        row.className = "row";
+        if (s) {
+          const what = s.issue_key || s.description || "this task";
+          const paused = s.state === "paused";
+          setHeadline(
+            paused ? `Paused on ${what}` : `Still on ${what}?`,
+            `${fmtElapsed(s.elapsed_seconds)} tracked` + (s.issue_key && s.description ? ` · ${s.description}` : ""),
           );
-          buttons.appendChild(
-            btn("Switch task", "ghost", async () => {
+          row.appendChild(btn(paused ? "Keep paused" : "Yes, still on it", "primary", () => window.desktop.answerCheckin()));
+          row.appendChild(
+            btn("Switch", "ghost", async () => {
               await window.desktop.openApp();
               window.desktop.answerCheckin();
             }),
           );
         } else {
-          titleEl.textContent = "What are you working on?";
-          bodyEl.textContent =
-            "No timer is running. Start tracking, or jot it down so the time isn't lost.";
-          noteEl.classList.remove("hidden");
-          noteEl.focus();
-          buttons.appendChild(
+          const plan = status && status.intention && status.intention.note;
+          setHeadline("No timer running", plan ? `Today's plan: ${plan.split("\n")[0]}` : "What are you working on?");
+          row.appendChild(
             btn("Start tracking", "primary", async () => {
               await window.desktop.openApp();
               window.desktop.answerCheckin();
             }),
           );
-          buttons.appendChild(
-            btn("Save note", "ghost", async () => {
-              const text = noteEl.value.trim();
-              if (text) await window.desktop.appendNote(text);
-              window.desktop.answerCheckin();
-            }),
-          );
-          buttons.appendChild(btn("Snooze", "ghost", () => window.desktop.snoozeNudge()));
+        }
+        row.appendChild(btn("Snooze 10m", "ghost", () => window.desktop.snoozeNudge()));
+        quick.appendChild(row);
+      }
+
+      async function sendReply() {
+        const text = replyEl.value.trim();
+        if (!text) return;
+        replyEl.value = "";
+        if (!document.body.classList.contains("chat")) {
+          document.body.classList.add("chat");
+          await window.desktop.expandNudge();
+          history.push({
+            role: "user",
+            content: "(Context: I'm answering my scheduled check-in from the desktop app. Keep replies short.)",
+          });
+        }
+        bubble("user", text);
+        history.push({ role: "user", content: text });
+        const typing = bubble("assistant", "...");
+        let res = null;
+        try {
+          res = await window.desktop.assistantChat(history);
+        } catch (e) {
+          res = null;
+        }
+        typing.remove();
+        if (res && res.reply) {
+          bubble("assistant", res.reply);
+          if (res.used_ai) history.push({ role: "assistant", content: res.reply });
+          if (res.action) renderAction(res.action);
+        } else {
+          bubble("assistant", "I couldn't reach the assistant. Use the buttons above.");
         }
       }
+
+      document.getElementById("close").addEventListener("click", () => window.desktop.dismissNudge());
+      document.getElementById("sendBtn").addEventListener("click", sendReply);
+      replyEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendReply();
+        }
+        if (e.key === "Escape") window.desktop.dismissNudge();
+      });
 
       init();
     </script>

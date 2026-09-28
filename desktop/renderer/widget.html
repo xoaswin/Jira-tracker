@@ -5,180 +5,130 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
     <title>Jira Tracker</title>
     <style>
-      /* The window itself is transparent; the pill below is the only visible
-         surface. The whole pill is a drag region (move it anywhere) except the
-         buttons, which are marked no-drag so they stay clickable. */
-      html,
-      body {
+      /* A single round floating button. The window is transparent; only the
+         circle shows. Dragging and clicking are handled manually in JS (an
+         -webkit-app-region drag region would swallow click events), so a small
+         move = drag, a tap in place = open the app. */
+      html, body {
         margin: 0;
-        padding: 0;
         height: 100%;
         background: transparent;
         overflow: hidden;
         font-family: "Segoe UI", system-ui, sans-serif;
         user-select: none;
-        cursor: default;
+        cursor: pointer;
       }
-      #pill {
-        -webkit-app-region: drag;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        height: 38px;
-        margin: 7px;
-        padding: 0 6px 0 12px;
-        border-radius: 19px;
-        background: #0f172a;
-        border: 1px solid #1e293b;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-        color: #e2e8f0;
-      }
-      #dot {
-        width: 9px;
-        height: 9px;
+      #fab {
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
-        background: #64748b;
-        flex: none;
-        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
-      }
-      #dot.active {
-        background: #22c55e;
-        animation: pulse 2s infinite;
-      }
-      #dot.paused {
-        background: #f59e0b;
-      }
-      @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
-        70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-      }
-      #label {
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-        min-width: 0;
-        flex: 1;
-      }
-      #key {
-        font-weight: 600;
-        font-size: 12.5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 96px;
-      }
-      #key.idle {
-        color: #94a3b8;
-        font-weight: 500;
-      }
-      #time {
-        font-variant-numeric: tabular-nums;
-        font-size: 12px;
-        color: #cbd5e1;
-        white-space: nowrap;
-      }
-      .btn {
-        -webkit-app-region: no-drag;
+        background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        box-shadow: 0 8px 22px rgba(79, 70, 229, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 26px;
-        height: 26px;
-        border: none;
-        border-radius: 50%;
-        background: transparent;
-        color: #94a3b8;
-        cursor: pointer;
-        font-size: 13px;
-        line-height: 1;
+        color: #fff;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
       }
-      .btn:hover {
-        background: #1e293b;
-        color: #e2e8f0;
+      #fab:hover {
+        transform: scale(1.06);
+        box-shadow: 0 10px 26px rgba(79, 70, 229, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+      #fab:active { transform: scale(0.96); }
+      #fab svg { width: 16px; height: 16px; }
+      /* Status dot: hidden when idle, green (tracking) / amber (paused). */
+      #dot {
+        position: absolute;
+        top: 1px;
+        right: 1px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 2px solid #0b0b12;
+        background: transparent;
+        display: none;
+      }
+      #dot.active { display: block; background: #22c55e; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); animation: pulse 2s infinite; }
+      #dot.paused { display: block; background: #f59e0b; }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+        70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
       }
     </style>
   </head>
   <body>
-    <div id="pill" title="Drag to move">
+    <div id="fab" title="Jira Tracker">
+      <!-- check-circle glyph (G7) -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.8 10A10 10 0 1 1 17 3.3"></path>
+        <path d="m9 11 3 3L22 4"></path>
+      </svg>
       <span id="dot"></span>
-      <span id="label">
-        <span id="key" class="idle">Loading…</span>
-        <span id="time"></span>
-      </span>
-      <button class="btn" id="checkin" title="Check in now">&#9679;</button>
-      <button class="btn" id="open" title="Open Jira Tracker">&#10530;</button>
     </div>
 
     <script>
+      const fab = document.getElementById("fab");
       const dot = document.getElementById("dot");
-      const keyEl = document.getElementById("key");
-      const timeEl = document.getElementById("time");
 
-      // Live-ticked from the last poll so the timer counts smoothly between
-      // the (cheaper) 15s status fetches.
-      let baseElapsed = 0; // seconds at last poll
-      let baseAt = Date.now();
-      let running = false;
-
+      // ---- status polling: color the dot + tooltip from the active session ----
+      let baseElapsed = 0, baseAt = Date.now(), running = false;
       function fmt(total) {
         total = Math.max(0, Math.floor(total));
-        const h = Math.floor(total / 3600);
-        const m = Math.floor((total % 3600) / 60);
-        const s = total % 60;
-        const mm = String(m).padStart(2, "0");
-        const ss = String(s).padStart(2, "0");
+        const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+        const mm = String(m).padStart(2, "0"), ss = String(s).padStart(2, "0");
         return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
       }
-
+      function setTooltip() {
+        if (running) fab.title = `Tracking ${fab.dataset.key || "a session"} - ${fmt(baseElapsed + (Date.now() - baseAt) / 1000)} (click to open)`;
+      }
       function render(status) {
         const s = status && status.session;
-        if (!status || !status.connected) {
+        if (!status || !status.connected || !s) {
           dot.className = "";
-          keyEl.className = "idle";
-          keyEl.textContent = status && !status.connected ? "Connect Jira" : "Offline";
-          timeEl.textContent = "";
           running = false;
-          return;
-        }
-        if (!s) {
-          dot.className = "";
-          keyEl.className = "idle";
-          keyEl.textContent = "Not tracking";
-          timeEl.textContent = "";
-          running = false;
+          fab.title = status && !status.connected ? "Jira Tracker - not connected (click to open)" : "Jira Tracker - not tracking (click to open)";
           return;
         }
         const active = s.state === "active";
         dot.className = active ? "active" : "paused";
-        keyEl.className = "";
-        keyEl.textContent = s.issue_key || (s.description ? s.description.slice(0, 18) : "Session");
-        keyEl.title = s.description || s.issue_key || "";
+        running = active;
         baseElapsed = typeof s.elapsed_seconds === "number" ? s.elapsed_seconds : 0;
         baseAt = Date.now();
-        running = active;
-        timeEl.textContent = fmt(baseElapsed);
+        fab.dataset.key = s.issue_key || (s.description ? s.description.slice(0, 24) : "a session");
+        setTooltip();
       }
-
       async function poll() {
-        try {
-          render(await window.desktop.getStatus());
-        } catch (e) {
-          /* backend not up yet; keep last render */
-        }
+        try { render(await window.desktop.getStatus()); } catch (e) { /* keep last */ }
       }
-
-      // Smooth local tick; only advances while the session is active.
-      setInterval(() => {
-        if (!running) return;
-        timeEl.textContent = fmt(baseElapsed + (Date.now() - baseAt) / 1000);
-      }, 1000);
-
+      setInterval(() => { if (running) setTooltip(); }, 1000);
       setInterval(poll, 15000);
       poll();
 
-      document.getElementById("open").addEventListener("click", () => window.desktop.openApp());
-      document.getElementById("checkin").addEventListener("click", () => window.desktop.triggerNudge());
+      // ---- manual drag vs click ----
+      let dragging = false, startX = 0, startY = 0, moved = 0;
+      fab.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        dragging = true; moved = 0; startX = e.screenX; startY = e.screenY;
+        window.desktop.widgetDragStart();
+      });
+      window.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        const dx = e.screenX - startX, dy = e.screenY - startY;
+        moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
+        window.desktop.widgetDragMove(dx, dy);
+      });
+      window.addEventListener("mouseup", () => {
+        if (!dragging) return;
+        dragging = false;
+        if (moved < 4) window.desktop.openApp();
+        else window.desktop.widgetDragEnd();
+      });
+      // Right-click opens a quick check-in.
+      fab.addEventListener("contextmenu", (e) => { e.preventDefault(); window.desktop.triggerNudge(); });
     </script>
   </body>
 </html>
