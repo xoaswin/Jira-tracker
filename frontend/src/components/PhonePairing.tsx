@@ -61,7 +61,7 @@ export function PhonePairing() {
         <div className="space-y-3 rounded-xl border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
             <div
-              className="shrink-0 overflow-hidden rounded-lg bg-white p-1 [&>svg]:h-44 [&>svg]:w-44"
+              className="h-56 w-56 shrink-0 rounded-lg bg-white [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
               // Generated server-side by segno from our own URL; not user input.
               dangerouslySetInnerHTML={{ __html: pairing.qr_svg }}
             />

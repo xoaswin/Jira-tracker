@@ -135,6 +135,11 @@ def pairing_url(host: str, port: int, token: str) -> str:
 
 
 def qr_svg(data: str) -> str:
+    """Scalable QR SVG. ``omitsize`` swaps fixed width/height for a viewBox so
+    CSS can resize it without cropping, and the 4-module quiet zone is what
+    phone scanners need to find the code."""
     import segno
 
-    return segno.make(data, error="m").svg_inline(scale=6, border=2, dark="#111827", light="#ffffff")
+    return segno.make(data, error="m").svg_inline(
+        border=4, omitsize=True, dark="#000000", light="#ffffff"
+    )

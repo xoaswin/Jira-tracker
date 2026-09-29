@@ -153,3 +153,10 @@ def test_wifi_address_beats_virtual_adapters():
         assert pairing.lan_ips() == ["192.168.228.5", "10.0.0.7", "172.18.192.1"]
     finally:
         mp.undo()
+
+
+def test_qr_svg_scales_without_cropping():
+    svg = pairing.qr_svg("http://192.168.1.20:8757/m/#t=" + "x" * 43)
+    # A viewBox (and no fixed size) lets CSS scale it instead of clipping it.
+    assert "viewBox=" in svg
+    assert 'width="' not in svg.split(">", 1)[0]
