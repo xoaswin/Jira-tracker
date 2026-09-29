@@ -56,6 +56,7 @@ jobs:
         run: |
           node --check desktop/main.js
           node --check desktop/preload.js
+          node --check desktop/recorder.js
           for f in desktop/renderer/*.html; do
             python3 -c "import re,sys; print('\n'.join(re.findall(r'<script>(.*?)</script>', open(sys.argv[1]).read(), re.S)))" "$f" > /tmp/inline.js
             node --check /tmp/inline.js || { echo "::error file=$f::inline script syntax error"; exit 1; }

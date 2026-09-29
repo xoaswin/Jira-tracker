@@ -47,6 +47,9 @@ class GitContext:
         return self.error is None and self.branch is not None
 
 
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 def _run_git(repo_path: Path, args: list[str]) -> str:
     """Run one git command in ``repo_path`` and return stripped stdout.
 
@@ -54,12 +57,17 @@ def _run_git(repo_path: Path, args: list[str]) -> str:
     ``subprocess.TimeoutExpired`` if it hangs. shell is always False.
     """
     result = subprocess.run(
-        ["git", "-C", str(repo_path), *args],
+        # safe.directory=*: repos under \\wsl.localhost are owned by the WSL
+        # user, which git on Windows otherwise refuses as "dubious ownership".
+        ["git", "-c", "safe.directory=*", "-C", str(repo_path), *args],
         capture_output=True,
         text=True,
         timeout=GIT_TIMEOUT_SECONDS,
         check=True,
         shell=False,
+        # The packaged backend has no console; without this every git call
+        # flashes a console window on Windows.
+        creationflags=_NO_WINDOW,
     )
     return result.stdout.strip()
 
@@ -287,6 +295,36 @@ def find_repo_for_issue(repo_paths: list[str], issue_key: str) -> str | None:
         if (ctx.issue_key or "").upper() == target:
             return path
     return None
+
+
+def current_branch(repo_path: str) -> str | None:
+    """The checked-out branch name, or None (detached, not a repo, git error)."""
+    path = Path(repo_path).expanduser()
+    if not path.exists():
+        return None
+    try:
+        branch = _run_git(path, ["rev-parse", "--abbrev-ref", "HEAD"])
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    return None if not branch or branch == "HEAD" else branch
+
+
+def commits_between(repo_path: str, start: datetime, end: datetime) -> list[tuple[datetime, str]]:
+    """(commit time, subject) on HEAD within [start, end], oldest first. Never raises."""
+    path = Path(repo_path).expanduser()
+    if not path.exists():
+        return []
+    try:
+        rows = _commits_with_time(path)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return []
+    lo, hi = start.timestamp(), end.timestamp()
+    kept = [
+        (datetime.fromtimestamp(ts, tz=timezone.utc), subject)
+        for ts, subject in rows
+        if lo <= ts <= hi
+    ]
+    return list(reversed(kept))
 
 
 def _head_mtime(repo_path: str) -> float:

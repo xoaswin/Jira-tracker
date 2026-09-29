@@ -33,6 +33,8 @@ import type {
   WorkSession,
   MobilePairResult,
   MobileStatus,
+  DayTimeline,
+  FocusReport,
 } from "./types";
 
 export class ApiError extends Error {
@@ -203,6 +205,12 @@ export const api = {
       issue_key,
       since,
     }),
+
+  // activity: day timeline + focus radar
+  activityDay: (date?: string) =>
+    request<DayTimeline>("GET", `/api/activity/day${date ? `?date=${date}` : ""}`),
+  activityFocus: (days = 7) => request<FocusReport>("GET", `/api/activity/focus?days=${days}`),
+  clearActivity: () => request<{ deleted: number }>("DELETE", "/api/activity"),
 
   // phone companion pairing
   mobileStatus: () => request<MobileStatus>("GET", "/api/mobile"),

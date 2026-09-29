@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   BarChart3,
+  GanttChart,
   Circle,
   ClipboardList,
   Command as CommandIcon,
@@ -28,6 +29,7 @@ import { Dashboard } from "./screens/Dashboard";
 import { MyTickets } from "./screens/MyTickets";
 import { Manage } from "./screens/Manage";
 import { Insights } from "./screens/Insights";
+import { Timeline } from "./screens/Timeline";
 import { CommandPalette } from "./components/CommandPalette";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { Assistant } from "./screens/Assistant";
@@ -120,6 +122,11 @@ export default function App() {
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     {
+      key: "timeline",
+      label: "Timeline",
+      icon: <GanttChart className="h-4 w-4" />,
+    },
+    {
       key: "insights",
       label: "Insights",
       icon: <BarChart3 className="h-4 w-4" />,
@@ -155,6 +162,8 @@ export default function App() {
         return <Manage />;
       case "insights":
         return <Insights />;
+      case "timeline":
+        return <Timeline />;
       case "assistant":
         return <Assistant />;
       case "settings":

@@ -87,8 +87,8 @@ def match(req: MatchRequest, db: Session = Depends(get_db)) -> MatchResponse:
 
 
 @router.get("/git/context", response_model=GitContextOut)
-def git_context() -> GitContextOut:
-    ctx = current_git_context()
+def git_context(db: Session = Depends(get_db)) -> GitContextOut:
+    ctx = current_git_context(db)
     if ctx is None:
         return GitContextOut(detected=False)
     if not ctx.ok:

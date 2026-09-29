@@ -50,6 +50,14 @@ export function formatDuration(totalSeconds: number): string {
   return parts.join(" ");
 }
 
+/** Minutes-resolution duration for charts and totals: "3h 05m", "45m". */
+export function formatHm(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds / 60) * 60);
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  return hours ? `${hours}h ${String(minutes).padStart(2, "0")}m` : `${minutes}m`;
+}
+
 /** Format seconds as HH:MM:SS for the large running clock. */
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));

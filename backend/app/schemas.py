@@ -296,6 +296,8 @@ class SettingsOut(BaseModel):
     daily_target_hours: float = 0.0
     checkin_interval_minutes: int = 0
     timezone: str = "Asia/Kolkata"
+    git_repo_paths: list[str] = Field(default_factory=list)
+    auto_track: bool = True
     auto_actual_dates: bool = False
     # Which issues are cached/searched per board (see ISSUE_SCOPE_JQL).
     issue_scope: str = "open_on_board"
@@ -319,6 +321,8 @@ class SettingsUpdate(BaseModel):
     daily_target_hours: float | None = None
     checkin_interval_minutes: int | None = None
     timezone: str | None = None
+    git_repo_paths: list[str] | None = None
+    auto_track: bool | None = None
     auto_actual_dates: bool | None = None
     # Optional: set a third-party AI key (stored in the keychain, not the DB).
     gemini_api_key: str | None = None

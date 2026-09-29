@@ -5,6 +5,7 @@ import { api, ApiError } from "../api/client";
 import { Banner, Button, Card, Label, TextInput } from "../components/ui";
 import { AISettings } from "../components/AISettings";
 import { PhonePairing } from "../components/PhonePairing";
+import { ActivitySettings } from "../components/ActivitySettings";
 
 export function Settings() {
   const status = useAuthStatus();
@@ -59,6 +60,8 @@ export function Settings() {
 
       {/* AI + behaviour settings, available once connected (Phase 5). */}
       {connected && <AISettings />}
+
+      {connected && <ActivitySettings />}
 
       {connected && <PhonePairing />}
 

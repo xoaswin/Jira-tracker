@@ -23,6 +23,7 @@ from app.db_init import run_migrations
 from app.jira.client import JiraError, configure_jira_logging
 from app.parent_watch import watch_parent_process
 from app.routers import (
+    activity as activity_router,
     assistant,
     auth,
     boards,
@@ -158,6 +159,7 @@ app.include_router(insights_router.router)
 app.include_router(assistant.router)
 app.include_router(wrapup.router)
 app.include_router(mobile.router)
+app.include_router(activity_router.router)
 
 
 # --- Production static serving (single process on 8756) ---

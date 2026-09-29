@@ -28,6 +28,7 @@
     },
     "files": [
       "main.js",
+      "recorder.js",
       "preload.js",
       "renderer/**/*",
       "assets/**/*"

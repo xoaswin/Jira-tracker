@@ -56,7 +56,7 @@ done
 
 echo "== [4/4] repack app.asar (main.js + preload + renderer + assets) =="
 STAGE="$(mktemp -d)"
-cp desktop/main.js desktop/preload.js desktop/package.json "$STAGE/"
+cp desktop/main.js desktop/preload.js desktop/recorder.js desktop/package.json "$STAGE/"
 cp -r desktop/renderer "$STAGE/"
 cp -r desktop/assets "$STAGE/"
 ( cd desktop && ./node_modules/.bin/asar pack "$STAGE" "release/win-unpacked/resources/app.asar" ) \

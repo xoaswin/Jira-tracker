@@ -9,7 +9,10 @@
 //   * asks for your start-of-day plan (plan.html) and stores it via the backend
 //     so the check-in can nudge you against it and it survives with no timer,
 //   * at work end shows an end-of-day wrap-up (wrapup.html): today's sessions
-//     with git-drafted worklog comments and one "Log all to Jira" button.
+//     with git-drafted worklog comments and one "Log all to Jira" button,
+//   * records which app/window is in front (recorder.js) to power zero-click
+//     tracking (auto start/switch with an undo toast, toast.html), the day
+//     timeline and the focus radar, and pauses the timer while you're away.
 //
 // The backend only allows CORS from the Vite dev origin, so the small windows
 // never fetch it directly: every backend call is proxied here over IPC.
@@ -28,6 +31,7 @@ const {
 const path = require("path");
 const fs = require("fs");
 const { spawn, execFile } = require("child_process");
+const { createRecorder } = require("./recorder");
 
 const BACKEND_PORT = 8756;
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
@@ -64,6 +68,13 @@ let widgetWindow = null;
 let nudgeWindow = null;
 let planWindow = null;
 let wrapupWindow = null;
+let toastWindow = null;
+let toastPayload = null;
+let recorder = null;
+// Zero-click tracking acts at most this often, so a flurry of suggestions
+// (or a backend hiccup) can't flap the timer.
+const AUTOTRACK_COOLDOWN_MS = 2 * 60_000;
+let lastAutotrackAt = 0;
 let tray = null;
 let schedulerTimer = null;
 let settingsTimer = null;
@@ -553,6 +564,60 @@ function openWrapupWindow() {
   });
 }
 
+// Small bottom-right toast for zero-click tracking ("Tracking X · Undo").
+const TOAST_W = 360;
+const TOAST_H = 92;
+
+function showToast(payload) {
+  toastPayload = payload;
+  if (toastWindow) {
+    toastWindow.webContents.send("toast:update");
+    toastWindow.showInactive();
+    return;
+  }
+  const wa = screen.getPrimaryDisplay().workArea;
+  toastWindow = new BrowserWindow({
+    width: TOAST_W,
+    height: TOAST_H,
+    x: wa.x + wa.width - TOAST_W - CORNER_MARGIN,
+    // Sit above the check-in card position so both can show.
+    y: wa.y + wa.height - TOAST_H - CORNER_MARGIN - (nudgeWindow ? NUDGE_H + 8 : 0),
+    frame: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    focusable: true,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  toastWindow.setAlwaysOnTop(true, "screen-saver");
+  toastWindow.loadFile(path.join(__dirname, "renderer", "toast.html"));
+  toastWindow.once("ready-to-show", () => toastWindow.showInactive());
+  toastWindow.on("closed", () => {
+    toastWindow = null;
+  });
+}
+
+async function handleSuggestion(sug) {
+  if (!sug || !sug.issue_key) return;
+  if (Date.now() - lastAutotrackAt < AUTOTRACK_COOLDOWN_MS) return;
+  lastAutotrackAt = Date.now();
+  const res = await apiPost("/api/activity/autotrack", { issue_key: sug.issue_key });
+  if (!res || !res.changed) return;
+  showToast({
+    session_id: res.session_id,
+    issue_key: res.issue_key,
+    previous: res.previous,
+  });
+}
+
 function createTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "tray-icon.ico"));
   tray = new Tray(icon);
@@ -725,6 +790,16 @@ function registerIpc() {
     if (planWindow) planWindow.close();
   });
 
+  ipcMain.handle("toast:get", () => toastPayload);
+  ipcMain.handle("toast:undo", async () => {
+    if (!toastPayload) return null;
+    const res = await apiPost("/api/activity/autotrack/undo", { session_id: toastPayload.session_id });
+    return res;
+  });
+  ipcMain.handle("toast:close", () => {
+    if (toastWindow) toastWindow.close();
+  });
+
   ipcMain.handle("wrapup:get", () => apiGet("/api/wrapup/today"));
   ipcMain.handle("wrapup:draft", (_e, sessionId) =>
     apiPost(`/api/wrapup/draft/${Number(sessionId)}`, {}),
@@ -803,6 +878,14 @@ app.whenReady().then(async () => {
   setTimeout(() => maybePromptPlan(), 1500);
   schedulerTimer = setInterval(schedulerTick, SCHEDULER_TICK_MS);
   settingsTimer = setInterval(refreshSettings, SETTINGS_REFRESH_MS);
+
+  recorder = createRecorder({
+    apiPost,
+    getSettings: () => settingsCache,
+    onSuggestion: (sug) => handleSuggestion(sug).catch(() => {}),
+    log: (msg) => console.log(msg),
+  });
+  recorder.start();
 });
 
 // Windows-only target: the tray + floating widget keep the app alive; never
@@ -811,6 +894,7 @@ app.on("window-all-closed", () => {});
 
 app.on("before-quit", () => {
   quitting = true;
+  if (recorder) recorder.stop();
   if (schedulerTimer) clearInterval(schedulerTimer);
   if (settingsTimer) clearInterval(settingsTimer);
   if (backendProcess && !backendProcess.killed) backendProcess.kill();

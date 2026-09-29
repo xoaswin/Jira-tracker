@@ -15,6 +15,7 @@ import { useUi } from "../store/ui";
 import { formatDuration, toHours } from "../lib/time";
 import { formatDateKey } from "../lib/tz";
 import { Banner, Button, Card, Spinner } from "../components/ui";
+import { FocusRadar } from "../components/FocusRadar";
 
 const PRESETS: { key: string; label: string }[] = [
   { key: "week", label: "This week" },
@@ -54,6 +55,8 @@ export function Insights() {
 
       {q.isLoading && <Spinner />}
       {q.isError && <Banner tone="error">{String(q.error)}</Banner>}
+
+      <FocusRadar />
 
       {data && data.session_count === 0 && (
         <Card>

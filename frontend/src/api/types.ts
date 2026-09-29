@@ -403,6 +403,9 @@ export interface AppSettingsData {
   checkin_interval_minutes: number;
   // IANA zone the workday is measured in (default Asia/Kolkata).
   timezone: string;
+  // Local git repos (Code folders) and the zero-click tracking switch.
+  git_repo_paths: string[];
+  auto_track: boolean;
   auto_actual_dates: boolean;
   has_gemini_key: boolean;
   has_groq_key: boolean;
@@ -431,4 +434,70 @@ export interface MobilePairResult extends MobileStatus {
   qr_svg: string;
   // Other laptop addresses to try if the phone can't open the QR link.
   alternate_urls: string[];
+}
+
+// --- activity: timeline + focus radar ---
+
+export type ActivityCategory = "code" | "browser" | "meeting" | "chat" | "docs" | "other" | "away";
+
+export interface ActivityBlock {
+  start: string;
+  end: string;
+  seconds: number;
+  app: string;
+  kind: "active" | "idle" | "locked";
+  category: ActivityCategory;
+  issue_key: string | null;
+  title: string;
+}
+
+export interface TimelineSession {
+  id: number;
+  issue_key: string | null;
+  description: string;
+  state: string;
+  origin: string | null;
+  sync_state: string;
+  start: string;
+  end: string;
+  seconds: number;
+}
+
+export interface TimelineCommit {
+  at: string;
+  subject: string;
+  repo: string;
+  issue_key: string | null;
+}
+
+export interface DayTimeline {
+  date: string;
+  day_start: string;
+  day_end: string;
+  now: string;
+  work: { start: string; end: string } | null;
+  activity: ActivityBlock[];
+  sessions: TimelineSession[];
+  commits: TimelineCommit[];
+  by_category: Partial<Record<ActivityCategory, number>>;
+  recording: boolean;
+}
+
+export interface FocusDay {
+  date: string;
+  active_seconds: number;
+  tracked_seconds: number;
+  switches: number;
+  switches_per_hour: number | null;
+  deep_blocks: number;
+  deep_seconds: number;
+  longest_deep_seconds: number;
+  late_seconds: number;
+}
+
+export interface FocusReport {
+  days: FocusDay[];
+  deep_by_hour: Record<string, number>;
+  tips: string[];
+  recording: boolean;
 }

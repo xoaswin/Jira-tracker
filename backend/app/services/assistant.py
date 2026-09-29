@@ -23,7 +23,6 @@ from sqlalchemy.orm import Session
 
 from app.ai.chat import ToolCall, safe_chat
 from app.ai.prompts import ASSISTANT_SYSTEM
-from app.config import get_settings
 from app.integrations.git import commits_since, find_repo_for_issue
 from app.jira.people import (
     list_priorities,
@@ -47,6 +46,7 @@ from app.services.manage import (
 from app.services.my_tickets import get_my_tickets
 from app.services.planning import build_day_plan
 from app.services.reports import week_report
+from app.services.repos import repo_paths
 from app.services.tz import app_tz, day_bounds, today as local_today
 from app.services.velocity import compute_velocity
 
@@ -515,7 +515,7 @@ def run_read_tool(name: str, args: dict, db: Session, req: AssistantChatRequest)
             })
 
         if name == "get_git_activity":
-            paths = get_settings().git_repo_paths
+            paths = repo_paths(db)
             if not paths:
                 return _json({"error": "no git repos configured in settings"})
             since = req.day_start.isoformat() if req.day_start else (now - timedelta(hours=24)).isoformat()

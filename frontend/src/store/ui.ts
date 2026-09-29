@@ -14,6 +14,7 @@ export type Screen =
   | "mytickets"
   | "manage"
   | "insights"
+  | "timeline"
   | "assistant"
   | "settings";
 

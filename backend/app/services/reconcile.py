@@ -26,10 +26,10 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.integrations.git import commit_counts_by_issue_key
 from app.models import WorkSession
 from app.services.duration import effective_duration_seconds
+from app.services.repos import repo_paths as repo_paths_for
 
 
 @dataclass
@@ -50,7 +50,7 @@ def _session_seconds(s: WorkSession) -> int:
 
 def reconcile(db: Session, start: datetime, end: datetime) -> list[ReconcileRow]:
     """Reconcile commits vs logged time per ticket in [start, end]."""
-    repo_paths = get_settings().git_repo_paths
+    repo_paths = repo_paths_for(db)
     commits = commit_counts_by_issue_key(
         repo_paths, start.isoformat(), end.isoformat()
     )

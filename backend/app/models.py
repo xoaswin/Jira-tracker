@@ -159,6 +159,12 @@ class AppSettings(Base):
     # IANA timezone the workday is measured in (see app.services.tz). The work
     # window above and every "today"/day bucket follow it, not the machine clock.
     timezone: Mapped[str] = mapped_column(String, default="Asia/Kolkata", nullable=False)
+    # Local git repos (Windows or \\wsl.localhost paths) for branch/commit
+    # context; merged with the GIT_REPO_PATHS env default (see services.repos).
+    git_repo_paths: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    # Desktop zero-click tracking: start/switch the timer from what you're
+    # working on (window titles, git branch), with undo. See services.activity.
+    auto_track: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # When true, finishing/logging a session best-effort stamps the ticket's
     # "actual start" (if not already set) and "actual end" date fields from the
@@ -225,3 +231,25 @@ class MobileDevice(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String, nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class ActivitySegment(Base):
+    """A stretch of time in one foreground window, recorded by the desktop app.
+
+    Local-only raw material for zero-click tracking, the day timeline and the
+    focus radar. ``kind`` is "active" (you were using the window), "idle" (no
+    input past the idle threshold) or "locked" (screen locked). ``issue_key`` is
+    the ticket inferred from the window title or the repo's git branch.
+    Pruned after ``services.activity.RETENTION_DAYS``.
+    """
+
+    __tablename__ = "activity_segments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
+    ended_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    app: Mapped[str] = mapped_column(String, nullable=False, default="")
+    title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    kind: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    issue_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    key_source: Mapped[str | None] = mapped_column(String, nullable=True)  # title|branch

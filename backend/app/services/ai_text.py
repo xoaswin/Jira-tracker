@@ -23,10 +23,10 @@ from app.ai.prompts import (
     daily_summary_user,
     worklog_from_diff_user,
 )
-from app.config import get_settings
 from app.integrations.git import commits_since, diffstat_since, find_repo_for_issue
 from app.models import WorkSession
 from app.services.duration import effective_duration_seconds
+from app.services.repos import repo_paths as repo_paths_for
 from app.services.tz import app_tz, day_bounds, today as local_today
 
 
@@ -62,7 +62,7 @@ def draft_worklog_from_git(
     * AI off/unreachable -> the raw commit list is returned as the text
       (used_ai False), which is still a useful worklog on its own.
     """
-    repo_paths = get_settings().git_repo_paths
+    repo_paths = repo_paths_for(db)
     repo = find_repo_for_issue(repo_paths, issue_key)
     if repo is None:
         return WorklogDraft(text="", used_ai=False, commit_count=0, repo_path=None)

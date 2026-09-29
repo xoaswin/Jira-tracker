@@ -48,4 +48,10 @@ contextBridge.exposeInMainWorld("desktop", {
   wrapupDraft: (sessionId) => ipcRenderer.invoke("wrapup:draft", sessionId),
   wrapupLog: (items) => ipcRenderer.invoke("wrapup:log", items),
   closeWrapup: () => ipcRenderer.invoke("wrapup:close"),
+
+  // Zero-click tracking toast ("Tracking PPVM-123 automatically · Undo").
+  toastGet: () => ipcRenderer.invoke("toast:get"),
+  toastUndo: () => ipcRenderer.invoke("toast:undo"),
+  toastClose: () => ipcRenderer.invoke("toast:close"),
+  onToastUpdate: (fn) => ipcRenderer.on("toast:update", () => fn()),
 });

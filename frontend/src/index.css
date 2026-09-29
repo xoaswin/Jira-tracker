@@ -68,3 +68,30 @@ body {
   background-clip: text;
   color: transparent;
 }
+
+/* Activity categories (timeline + focus radar). Reference categorical palette
+   in fixed order, validated for CVD separation on white and on slate-900. */
+:root {
+  --cat-code: #2a78d6;
+  --cat-browser: #eb6834;
+  --cat-meeting: #1baf7a;
+  --cat-chat: #eda100;
+  --cat-docs: #e87ba4;
+  --cat-other: #008300;
+  --cat-away: #cbd5e1;
+  --viz-tracked: #7c3aed;
+  --viz-gap: rgba(245, 158, 11, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cat-code: #3987e5;
+    --cat-browser: #d95926;
+    --cat-meeting: #199e70;
+    --cat-chat: #c98500;
+    --cat-docs: #d55181;
+    --cat-other: #008300;
+    --cat-away: #334155;
+    --viz-tracked: #8b5cf6;
+    --viz-gap: rgba(245, 158, 11, 0.14);
+  }
+}
