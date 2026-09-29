@@ -10,6 +10,9 @@
 //     so the check-in can nudge you against it and it survives with no timer,
 //   * at work end shows an end-of-day wrap-up (wrapup.html): today's sessions
 //     with git-drafted worklog comments and one "Log all to Jira" button,
+//   * voice check-in: Ctrl+Alt+Space (or the mic in the card) records a short
+//     clip, transcribed by Groq Whisper via the backend, then handled by the
+//     assistant (actions still need a confirm click),
 //   * records which app/window is in front (recorder.js) to power zero-click
 //     tracking (auto start/switch with an undo toast, toast.html), the day
 //     timeline and the focus radar, and pauses the timer while you're away.
@@ -25,6 +28,8 @@ const {
   Menu,
   nativeImage,
   shell,
+  globalShortcut,
+  session,
   ipcMain,
   screen,
 } = require("electron");
@@ -458,10 +463,14 @@ function createWidgetWindow() {
   });
 }
 
-function openNudgeWindow() {
+// ``opts.voice`` starts recording as soon as the card opens (the hotkey).
+// Tray/menu clicks pass a MenuItem as the first argument, hence the strict check.
+function openNudgeWindow(opts) {
+  const voice = !!(opts && opts.voice === true);
   if (nudgeWindow) {
     nudgeWindow.show();
-    nudgeWindow.focus();
+    if (voice) nudgeWindow.webContents.send("voice:toggle");
+    else nudgeWindow.focus();
     return;
   }
   const wa = screen.getPrimaryDisplay().workArea;
@@ -487,7 +496,9 @@ function openNudgeWindow() {
     },
   });
   nudgeWindow.setAlwaysOnTop(true, "screen-saver");
-  nudgeWindow.loadFile(path.join(__dirname, "renderer", "nudge.html"));
+  nudgeWindow.loadFile(path.join(__dirname, "renderer", "nudge.html"), {
+    query: voice ? { voice: "1" } : {},
+  });
   // showInactive: don't steal focus from whatever you're typing in.
   nudgeWindow.once("ready-to-show", () => nudgeWindow.showInactive());
   nudgeWindow.on("closed", () => {
@@ -761,6 +772,23 @@ function registerIpc() {
   ipcMain.handle("app:open", () => {
     showMainWindow();
   });
+  // Voice: the renderer records; main forwards the raw clip to the backend
+  // (renderers never talk to the backend directly).
+  ipcMain.handle("voice:transcribe", async (_e, bytes, mime) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/voice/transcribe`, {
+        method: "POST",
+        headers: { "Content-Type": mime || "audio/webm" },
+        body: Buffer.from(bytes),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: body.detail || `Transcription failed (${res.status}).` };
+      return { text: body.text || "" };
+    } catch {
+      return { error: "The tracker backend isn't reachable." };
+    }
+  });
+
   ipcMain.handle("nudge:trigger", () => {
     snoozeUntil = 0;
     openNudgeWindow();
@@ -850,6 +878,15 @@ if (!gotLock) {
 app.whenReady().then(async () => {
   if (!gotLock) return;
   registerIpc();
+  // Microphone for voice check-ins: only our own windows (local renderer
+  // files and the bundled UI on the loopback backend) may use it.
+  const ours = (url) => url.startsWith("file://") || url.startsWith(BACKEND_URL);
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
+    cb(permission === "media" && ours(wc.getURL()));
+  });
+  session.defaultSession.setPermissionCheckHandler((wc, permission) => {
+    return permission === "media" && !!wc && ours(wc.getURL());
+  });
   // In dev (unpackaged), if a backend is already serving 8756 (e.g. `make dev`
   // in WSL, reachable from Windows via localhost forwarding), reuse it instead
   // of spawning the bundled PyInstaller exe. That exe can be stale between
@@ -886,6 +923,11 @@ app.whenReady().then(async () => {
     log: (msg) => console.log(msg),
   });
   recorder.start();
+
+  // Global voice check-in hotkey (toggle: press to talk, press again to send).
+  if (!globalShortcut.register("CommandOrControl+Alt+Space", () => openNudgeWindow({ voice: true }))) {
+    console.warn("[voice] Ctrl+Alt+Space is taken by another app; use the mic in the check-in card");
+  }
 });
 
 // Windows-only target: the tray + floating widget keep the app alive; never
@@ -894,6 +936,7 @@ app.on("window-all-closed", () => {});
 
 app.on("before-quit", () => {
   quitting = true;
+  globalShortcut.unregisterAll();
   if (recorder) recorder.stop();
   if (schedulerTimer) clearInterval(schedulerTimer);
   if (settingsTimer) clearInterval(settingsTimer);

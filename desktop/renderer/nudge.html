@@ -119,6 +119,12 @@
       }
       textarea:focus { outline: none; border-color: #8b5cf6; }
       .send { padding: 7px 11px; }
+      .mic { padding: 7px 10px; }
+      .mic.rec { background: rgba(244, 63, 94, 0.2); color: #fda4af; border-color: rgba(244, 63, 94, 0.5); animation: pulse 1.2s infinite; }
+      @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.15); } }
+      #voiceStatus { padding: 0 14px 8px; font-size: 11.5px; color: #94a3b8; min-height: 0; }
+      #voiceStatus:empty { display: none; }
+      #voiceStatus.err { color: #fda4af; }
     </style>
   </head>
   <body>
@@ -133,8 +139,10 @@
 
     <div id="composer">
       <textarea id="reply" rows="1" placeholder="Or tell me what you're doing..."></textarea>
+      <button class="ghost mic" id="micBtn" title="Speak (Ctrl+Alt+Space)">&#127908;</button>
       <button class="primary send" id="sendBtn" title="Send">&#10148;</button>
     </div>
+    <div id="voiceStatus"></div>
 
     <script>
       const headline = document.getElementById("headline");
@@ -275,6 +283,55 @@
           bubble("assistant", "I couldn't reach the assistant. Use the buttons above.");
         }
       }
+
+      // --- voice: record a short clip, transcribe, then send it as a reply ---
+      const micBtn = document.getElementById("micBtn");
+      const voiceStatus = document.getElementById("voiceStatus");
+      const MAX_RECORD_MS = 30000;
+      let rec = null;
+      let recTimer = null;
+
+      function setVoiceStatus(text, err) {
+        voiceStatus.textContent = text || "";
+        voiceStatus.className = err ? "err" : "";
+      }
+
+      async function toggleVoice() {
+        if (rec) return rec.stop();
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          return setVoiceStatus("Microphone unavailable. Check Windows privacy settings for the mic.", true);
+        }
+        const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
+        const chunks = [];
+        rec = new MediaRecorder(stream, { mimeType: mime });
+        rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+        rec.onstop = async () => {
+          clearTimeout(recTimer);
+          stream.getTracks().forEach((t) => t.stop());
+          rec = null;
+          micBtn.classList.remove("rec");
+          if (!chunks.length) return setVoiceStatus("");
+          setVoiceStatus("Transcribing...");
+          const buf = await new Blob(chunks, { type: mime }).arrayBuffer();
+          const res = await window.desktop.transcribe(buf, mime);
+          if (!res || res.error) return setVoiceStatus((res && res.error) || "Transcription failed.", true);
+          if (!res.text) return setVoiceStatus("Didn't catch that. Try again.", true);
+          setVoiceStatus("");
+          replyEl.value = res.text;
+          sendReply();
+        };
+        rec.start();
+        micBtn.classList.add("rec");
+        setVoiceStatus("Listening... press the mic (or Ctrl+Alt+Space) again to send.");
+        recTimer = setTimeout(() => rec && rec.stop(), MAX_RECORD_MS);
+      }
+
+      micBtn.addEventListener("click", toggleVoice);
+      window.desktop.onVoiceToggle(toggleVoice);
+      if (new URLSearchParams(location.search).get("voice") === "1") toggleVoice();
 
       document.getElementById("close").addEventListener("click", () => window.desktop.dismissNudge());
       document.getElementById("sendBtn").addEventListener("click", sendReply);

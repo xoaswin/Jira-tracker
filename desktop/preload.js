@@ -49,6 +49,11 @@ contextBridge.exposeInMainWorld("desktop", {
   wrapupLog: (items) => ipcRenderer.invoke("wrapup:log", items),
   closeWrapup: () => ipcRenderer.invoke("wrapup:close"),
 
+  // Voice check-in: send a recorded clip (ArrayBuffer) for transcription;
+  // resolves {text} or {error}. onVoiceToggle fires on the global hotkey.
+  transcribe: (bytes, mime) => ipcRenderer.invoke("voice:transcribe", bytes, mime),
+  onVoiceToggle: (fn) => ipcRenderer.on("voice:toggle", () => fn()),
+
   // Zero-click tracking toast ("Tracking PPVM-123 automatically · Undo").
   toastGet: () => ipcRenderer.invoke("toast:get"),
   toastUndo: () => ipcRenderer.invoke("toast:undo"),

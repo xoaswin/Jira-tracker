@@ -4,7 +4,7 @@
 // its parent (parent controls the height and the surrounding chrome).
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2, Send } from "lucide-react";
+import { Check, Loader2, Mic, Send, Square } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { useAiStatus } from "../api/hooks";
@@ -12,6 +12,7 @@ import { useUi } from "../store/ui";
 import type { ChatMessage, ProposedAction } from "../api/types";
 import { Button } from "./ui";
 import { startOfZonedDay, zonedDateStr } from "../lib/tz";
+import { useVoiceInput } from "../lib/voice";
 
 const SUGGESTIONS = [
   "Summarize my day",
@@ -42,6 +43,8 @@ export function AssistantChat({ autoFocus = false }: { autoFocus?: boolean }) {
   const [actingIdx, setActingIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Speak instead of typing: the transcript is sent like a typed message.
+  const voice = useVoiceInput((text) => send(text));
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -236,10 +239,28 @@ export function AssistantChat({ autoFocus = false }: { autoFocus?: boolean }) {
             placeholder="Ask your assistant..."
             className="max-h-32 min-h-[40px] w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/15 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
+          {voice.supported && (
+            <Button
+              type="button"
+              variant={voice.recording ? "danger" : "secondary"}
+              onClick={voice.toggle}
+              loading={voice.busy}
+              disabled={sending}
+              title={voice.recording ? "Stop and send" : "Speak"}
+              className="px-3 py-2.5"
+            >
+              {voice.recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+          )}
           <Button type="submit" disabled={!input.trim() || sending} className="px-3 py-2.5">
             <Send className="h-4 w-4" />
           </Button>
         </div>
+        {(voice.recording || voice.error) && (
+          <p className={`mt-1.5 text-xs ${voice.error ? "text-rose-500" : "text-slate-400"}`}>
+            {voice.error ?? "Listening... press stop to send."}
+          </p>
+        )}
       </form>
     </div>
   );

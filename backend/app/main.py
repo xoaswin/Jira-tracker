@@ -38,6 +38,7 @@ from app.routers import (
     sessions,
     settings as settings_router,
     velocity as velocity_router,
+    voice,
     wrapup,
 )
 from app.services.connection import NotConnectedError, ensure_settings_row
@@ -160,6 +161,7 @@ app.include_router(assistant.router)
 app.include_router(wrapup.router)
 app.include_router(mobile.router)
 app.include_router(activity_router.router)
+app.include_router(voice.router)
 
 
 # --- Production static serving (single process on 8756) ---
