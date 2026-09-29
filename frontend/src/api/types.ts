@@ -407,3 +407,28 @@ export interface AppSettingsData {
   has_gemini_key: boolean;
   has_groq_key: boolean;
 }
+
+// --- phone companion (pairing) ---
+
+export interface MobileDevice {
+  id: number;
+  name: string;
+  created_at: string | null;
+  last_seen_at: string | null;
+  user_agent: string | null;
+}
+
+export interface MobileStatus {
+  running: boolean;
+  port: number;
+  lan_ip: string | null;
+  devices: MobileDevice[];
+}
+
+export interface MobilePairResult extends MobileStatus {
+  device: MobileDevice;
+  url: string;
+  qr_svg: string;
+  // Other laptop addresses to try if the phone can't open the QR link.
+  alternate_urls: string[];
+}

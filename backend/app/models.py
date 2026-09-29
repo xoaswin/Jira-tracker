@@ -206,3 +206,22 @@ class DayIntention(Base):
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class MobileDevice(Base):
+    """A phone paired to the mobile companion (see ``app.mobile``).
+
+    Pairing mints a random token that travels to the phone inside a QR code;
+    only its SHA-256 is stored, so the DB never holds a usable credential.
+    Revoking sets ``revoked_at``; the row stays for the device list.
+    """
+
+    __tablename__ = "mobile_devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, default="Phone", nullable=False)
+    token_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:" />
+    <meta name="theme-color" content="#0b0b12" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tracker" />
+    <link rel="manifest" href="/m/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/m/icon-256.png" />
+    <title>Jira Tracker</title>
+    <style>
+      :root {
+        --bg: #0b0b12; --card: #141421; --line: rgba(255, 255, 255, 0.08);
+        --text: #e2e8f0; --muted: #94a3b8; --violet: #7c3aed; --violet-soft: rgba(139, 92, 246, 0.16);
+        --green: #22c55e; --amber: #f59e0b; --red: #f43f5e;
+      }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body { margin: 0; background: var(--bg); color: var(--text); }
+      body {
+        font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+        min-height: 100dvh;
+        padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+        max-width: 520px; margin: 0 auto;
+      }
+      header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+      header img { width: 28px; height: 28px; }
+      header h1 { font-size: 16px; margin: 0; flex: 1; }
+      .conn { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+      .conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+      .conn.ok i { background: var(--green); }
+      .conn.bad i { background: var(--red); }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 14px; }
+      .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+      .timer { font-size: 54px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin: 6px 0 4px; }
+      .timer.paused { color: var(--amber); }
+      .key { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; color: #c4b5fd; }
+      .desc { color: var(--muted); font-size: 14px; margin-top: 2px; overflow-wrap: anywhere; }
+      .row { display: flex; gap: 10px; margin-top: 16px; }
+      button {
+        flex: 1; min-height: 50px; border-radius: 14px; border: 1px solid transparent;
+        font: inherit; font-size: 16px; font-weight: 650; color: var(--text); cursor: pointer;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      button:active { transform: scale(0.98); }
+      button:disabled { opacity: 0.5; }
+      .primary { background: var(--violet); color: #fff; }
+      .danger { background: rgba(244, 63, 94, 0.14); color: #fda4af; border-color: rgba(244, 63, 94, 0.3); }
+      .meter { height: 8px; background: rgba(255, 255, 255, 0.06); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+      .meter span { display: block; height: 100%; background: linear-gradient(90deg, #8b5cf6, var(--green)); }
+      .totals { display: flex; justify-content: space-between; font-size: 14px; margin-top: 6px; color: var(--muted); }
+      .totals b { color: var(--text); font-weight: 650; }
+      .ribbon { position: relative; height: 26px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; margin-top: 14px; overflow: hidden; }
+      .ribbon span { position: absolute; top: 0; bottom: 0; background: var(--violet); opacity: 0.85; border-radius: 3px; }
+      .ribbon span.live { background: var(--green); }
+      .ticks { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+      ul { list-style: none; margin: 10px 0 0; padding: 0; }
+      li { display: flex; gap: 10px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+      li:first-child { border-top: 0; }
+      li .t { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 46px; }
+      li .d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      li .s { color: var(--muted); font-variant-numeric: tabular-nums; }
+      .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+      .toast {
+        position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+        background: #1f1f33; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
+        font-size: 14px; max-width: 488px; margin: 0 auto;
+      }
+      /* ticket picker sheet */
+      .sheet { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: flex-end; }
+      .sheet .panel {
+        background: var(--card); width: 100%; max-width: 520px; margin: 0 auto; max-height: 86dvh;
+        border-radius: 20px 20px 0 0; padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+        display: flex; flex-direction: column;
+      }
+      input {
+        width: 100%; min-height: 48px; border-radius: 12px; border: 1px solid var(--line);
+        background: #0f1424; color: var(--text); font: inherit; font-size: 16px; padding: 0 14px;
+      }
+      input:focus { outline: none; border-color: #8b5cf6; }
+      .results { overflow-y: auto; margin-top: 10px; }
+      .opt { padding: 12px 4px; border-top: 1px solid var(--line); cursor: pointer; }
+      .opt:first-child { border-top: 0; }
+      .opt .summary { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+      .pair { text-align: center; padding: 40px 10px; color: var(--muted); line-height: 1.5; }
+      .pair h2 { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="/m/icon-256.png" alt="" />
+      <h1>Jira Tracker</h1>
+      <span class="conn" id="conn"><i></i><span>Connecting</span></span>
+    </header>
+
+    <main id="app" hidden>
+      <section class="card" id="now">
+        <div class="label" id="nowLabel">Not tracking</div>
+        <div class="timer" id="timer">0:00:00</div>
+        <div><span class="key" id="nowKey"></span></div>
+        <div class="desc" id="nowDesc">Pick a ticket to start.</div>
+        <div class="row" id="controls"></div>
+      </section>
+
+      <section class="card">
+        <div class="label">Today</div>
+        <div class="totals"><span><b id="tracked">0m</b> tracked</span><span id="target"></span></div>
+        <div class="meter" id="meter" hidden><span id="meterFill"></span></div>
+        <div class="ribbon" id="ribbon"></div>
+        <div class="ticks" id="ticks"></div>
+        <ul id="list"></ul>
+      </section>
+    </main>
+
+    <div class="pair" id="unpaired" hidden>
+      <h2>Not paired</h2>
+      <p>On your laptop open <b>Jira Tracker &rarr; Settings &rarr; Phone</b>, tap <b>Pair a phone</b>, and scan the QR code with this phone's camera.</p>
+    </div>
+
+    <div class="sheet" id="sheet" hidden>
+      <div class="panel">
+        <input id="search" placeholder="Search tickets, or type what you're doing" autocomplete="off" enterkeyhint="go" />
+        <div class="results" id="results"></div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script>
+      // --- pairing token: arrives in the URL fragment, then lives in storage ---
+      const TOKEN_KEY = "jt-device-token";
+      (function captureToken() {
+        const m = location.hash.match(/[#&]t=([^&]+)/);
+        if (m) {
+          try { localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1])); } catch (e) { /* private mode */ }
+          window.__token = decodeURIComponent(m[1]);
+          history.replaceState(null, "", location.pathname); // drop the token from the address bar
+        }
+      })();
+      function token() {
+        if (window.__token) return window.__token;
+        try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+      }
+
+      const $ = (id) => document.getElementById(id);
+      let state = null;
+      let syncedAt = Date.now();
+      let busy = false;
+
+      async function api(path, opts = {}) {
+        const res = await fetch(path, {
+          ...opts,
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (token() || "") },
+        });
+        if (res.status === 401) {
+          showUnpaired();
+          throw new Error("unpaired");
+        }
+        if (!res.ok) {
+          let msg = "Something went wrong.";
+          try { msg = (await res.json()).detail || msg; } catch (e) { /* not json */ }
+          throw new Error(msg);
+        }
+        return res.json();
+      }
+
+      function setConn(ok, text) {
+        const c = $("conn");
+        c.className = "conn " + (ok ? "ok" : "bad");
+        c.lastElementChild.textContent = text;
+      }
+
+      function showUnpaired() {
+        $("app").hidden = true;
+        $("unpaired").hidden = false;
+        setConn(false, "Not paired");
+      }
+
+      function toast(text) {
+        const t = $("toast");
+        t.textContent = text;
+        t.hidden = false;
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => (t.hidden = true), 3500);
+      }
+
+      function hms(sec) {
+        sec = Math.max(0, Math.floor(sec));
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+        return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      }
+      function short(sec) {
+        sec = Math.max(0, Math.floor(sec || 0));
+        const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+        return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+      }
+      function clock(iso) {
+        return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: state.tz || undefined });
+      }
+
+      function btn(label, cls, fn) {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.className = cls;
+        b.addEventListener("click", async () => {
+          if (busy) return;
+          busy = true;
+          b.disabled = true;
+          try { await fn(); } catch (e) { if (e.message !== "unpaired") toast(e.message); }
+          busy = false;
+          b.disabled = false;
+        });
+        return b;
+      }
+
+      function apply(next) {
+        state = next;
+        syncedAt = Date.now();
+        if (next.warning) toast(next.warning);
+        render();
+      }
+
+      function liveElapsed() {
+        const s = state && state.session;
+        if (!s) return 0;
+        const base = s.elapsed_seconds || 0;
+        return s.state === "active" ? base + (Date.now() - syncedAt) / 1000 : base;
+      }
+
+      function render() {
+        $("unpaired").hidden = true;
+        $("app").hidden = false;
+        const s = state.session;
+        const controls = $("controls");
+        controls.replaceChildren();
+        $("timer").className = "timer" + (s && s.state === "paused" ? " paused" : "");
+        if (s) {
+          $("nowLabel").textContent = s.state === "paused" ? "Paused" : "Tracking";
+          $("nowKey").textContent = s.issue_key || "";
+          $("nowDesc").textContent = s.description || "";
+          controls.append(
+            s.state === "paused"
+              ? btn("Resume", "primary", async () => apply(await api("/api/m/resume", { method: "POST" })))
+              : btn("Pause", "", async () => apply(await api("/api/m/pause", { method: "POST" }))),
+            btn("Switch", "", openPicker),
+            btn("Stop", "danger", async () => {
+              apply(await api("/api/m/stop", { method: "POST" }));
+              toast("Stopped. Logging to Jira.");
+            }),
+          );
+        } else {
+          $("nowLabel").textContent = "Not tracking";
+          $("nowKey").textContent = "";
+          $("nowDesc").textContent = "Pick a ticket to start.";
+          controls.append(btn("Start tracking", "primary", openPicker));
+        }
+        tick();
+        renderToday();
+      }
+
+      function tick() {
+        $("timer").textContent = hms(liveElapsed());
+      }
+
+      function renderToday() {
+        const t = state.today;
+        const live = liveElapsed();
+        const tracked = t.tracked_seconds + live;
+        $("tracked").textContent = short(tracked);
+        $("target").textContent = t.target_seconds ? `of ${short(t.target_seconds)}` : "";
+        $("meter").hidden = !t.target_seconds;
+        if (t.target_seconds) $("meterFill").style.width = Math.min(100, (tracked / t.target_seconds) * 100) + "%";
+
+        // Day ribbon: sessions placed on a window from the first start to now.
+        const ribbon = $("ribbon");
+        ribbon.replaceChildren();
+        const spans = t.sessions.map((x) => ({ a: Date.parse(x.started_at), b: Date.parse(x.ended_at || x.started_at), live: false }));
+        if (state.session) spans.push({ a: Date.parse(state.session.started_at), b: Date.now(), live: true });
+        const now = Date.now();
+        const start = spans.length ? Math.min(...spans.map((x) => x.a)) : now - 3600e3;
+        const range = Math.max(now - start, 3600e3);
+        for (const x of spans) {
+          const el = document.createElement("span");
+          el.style.left = ((x.a - start) / range) * 100 + "%";
+          el.style.width = Math.max(0.8, ((x.b - x.a) / range) * 100) + "%";
+          if (x.live) el.className = "live";
+          ribbon.appendChild(el);
+        }
+        $("ticks").replaceChildren(
+          Object.assign(document.createElement("span"), { textContent: clock(new Date(start).toISOString()) }),
+          Object.assign(document.createElement("span"), { textContent: "now" }),
+        );
+
+        const list = $("list");
+        list.replaceChildren();
+        if (!t.sessions.length) {
+          list.appendChild(Object.assign(document.createElement("li"), { className: "empty", textContent: "No finished sessions yet today." }));
+        }
+        for (const x of [...t.sessions].reverse()) {
+          const li = document.createElement("li");
+          const d = document.createElement("span");
+          d.className = "d";
+          if (x.issue_key) d.append(Object.assign(document.createElement("span"), { className: "key", textContent: x.issue_key + " " }));
+          d.append(x.description || "");
+          li.append(
+            Object.assign(document.createElement("span"), { className: "t", textContent: clock(x.started_at) }),
+            d,
+            Object.assign(document.createElement("span"), { className: "s", textContent: short(x.seconds) }),
+          );
+          list.appendChild(li);
+        }
+      }
+
+      // --- ticket picker ------------------------------------------------------
+      let searchTimer = null;
+      function openPicker() {
+        $("sheet").hidden = false;
+        $("search").value = "";
+        loadTickets("");
+        setTimeout(() => $("search").focus(), 50);
+      }
+      function closePicker() { $("sheet").hidden = true; }
+      $("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") closePicker(); });
+      $("search").addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadTickets($("search").value), 200);
+      });
+      $("search").addEventListener("keydown", async (e) => {
+        if (e.key !== "Enter") return;
+        const text = $("search").value.trim();
+        if (!text) return;
+        // A typed key ("PPVM-123") starts on that ticket; anything else is a description.
+        const isKey = /^[A-Za-z][A-Za-z0-9]+-\d+$/.test(text);
+        await startOn(isKey ? { issue_key: text } : { description: text });
+      });
+
+      async function loadTickets(q) {
+        const box = $("results");
+        let items = [];
+        try { items = await api("/api/m/tickets?q=" + encodeURIComponent(q)); } catch (e) { return; }
+        box.replaceChildren();
+        if (!items.length) {
+          box.appendChild(Object.assign(document.createElement("div"), { className: "empty", textContent: q ? "No matches. Press Go to track it as a description." : "No tickets cached yet." }));
+        }
+        for (const t of items) {
+          const o = document.createElement("div");
+          o.className = "opt";
+          o.append(
+            Object.assign(document.createElement("div"), { className: "key", textContent: t.issue_key }),
+            Object.assign(document.createElement("div"), { className: "summary", textContent: t.summary || "" }),
+          );
+          o.addEventListener("click", () => startOn({ issue_key: t.issue_key }));
+          box.appendChild(o);
+        }
+      }
+
+      async function startOn(body) {
+        if (busy) return;
+        busy = true;
+        try {
+          apply(await api("/api/m/start", { method: "POST", body: JSON.stringify(body) }));
+          closePicker();
+          toast("Tracking " + (body.issue_key ? body.issue_key.toUpperCase() : body.description));
+        } catch (e) {
+          if (e.message !== "unpaired") toast(e.message);
+        }
+        busy = false;
+      }
+
+      // --- sync loop ---------------------------------------------------------
+      async function refresh() {
+        if (!token()) return showUnpaired();
+        try {
+          apply(await api("/api/m/state"));
+          setConn(true, "Laptop connected");
+        } catch (e) {
+          if (e.message !== "unpaired") setConn(false, "Laptop unreachable");
+        }
+      }
+      setInterval(() => { if (state) { tick(); } }, 1000);
+      setInterval(() => { if (state) renderToday(); }, 30000);
+      setInterval(refresh, 10000);
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+      refresh();
+    </script>
+  </body>
+</html>

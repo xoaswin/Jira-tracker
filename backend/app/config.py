@@ -43,6 +43,8 @@ class Settings(BaseSettings):
 
     # --- Core app ---
     app_port: int = 8756
+    # Phone companion listener (LAN, token-guarded; see app.mobile).
+    mobile_port: int = 8757
     database_url: str = f"sqlite:///{BACKEND_ROOT / 'data' / 'tracker.db'}"
     timezone: str = "UTC"
 
@@ -59,6 +61,8 @@ class Settings(BaseSettings):
     # The background poller drains due outbox items every few seconds. Tests
     # drive the worker explicitly, so it defaults off under pytest (see below).
     disable_background_poller: bool = "pytest" in sys.modules
+    # Tests drive the mobile app in-process; never bind a real LAN port there.
+    disable_mobile_listener: bool = "pytest" in sys.modules
 
     # --- First-run Jira defaults (real values live in the DB settings row) ---
     jira_base_url: str | None = None

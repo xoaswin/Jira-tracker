@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.hooks import copy_metadata
 
-datas = [('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/backend/alembic.ini', 'backend'), ('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/backend/alembic', 'backend/alembic'), ('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/frontend/dist', 'frontend/dist')]
+datas = [('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/backend/alembic.ini', 'backend'), ('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/backend/alembic', 'backend/alembic'), ('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/frontend/dist', 'frontend/dist'), ('C:/Users/AswinAnanthakumar/OneDrive - zeb/Desktop/ezjira/jira-tracker/backend/app/mobile/static', 'app/mobile/static')]
 binaries = []
 hiddenimports = ['keyring.backends.Windows']
 datas += collect_data_files('tzdata')

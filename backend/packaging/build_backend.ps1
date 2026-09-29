@@ -24,6 +24,7 @@ $BackendRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $AlembicIni = Join-Path $BackendRoot "alembic.ini"
 $AlembicDir = Join-Path $BackendRoot "alembic"
 $MainPy = Join-Path $BackendRoot "app\main.py"
+$MobileStatic = Join-Path $BackendRoot "app\mobile\static"
 $FrontendDist = Resolve-Path (Join-Path $BackendRoot "..\frontend\dist") -ErrorAction SilentlyContinue
 if (-not $FrontendDist) {
     Write-Error "frontend/dist not found - run 'npm run build' in frontend/ first."
@@ -43,6 +44,7 @@ try {
         --add-data "${AlembicIni};backend" `
         --add-data "${AlembicDir};backend\alembic" `
         --add-data "${FrontendDist};frontend\dist" `
+        --add-data "${MobileStatic};app\mobile\static" `
         --hidden-import keyring.backends.Windows `
         --collect-all win32ctypes `
         --collect-data tzdata `

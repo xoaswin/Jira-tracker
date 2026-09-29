@@ -31,6 +31,8 @@ import type {
   WeekReport,
   WorklogEntry,
   WorkSession,
+  MobilePairResult,
+  MobileStatus,
 } from "./types";
 
 export class ApiError extends Error {
@@ -201,6 +203,13 @@ export const api = {
       issue_key,
       since,
     }),
+
+  // phone companion pairing
+  mobileStatus: () => request<MobileStatus>("GET", "/api/mobile"),
+  pairPhone: (name?: string) =>
+    request<MobilePairResult>("POST", "/api/mobile/pair", { name: name ?? null }),
+  unpairPhone: (id: number) =>
+    request<MobileStatus>("DELETE", `/api/mobile/devices/${id}`),
 
   // settings (Phase 5)
   settings: () => request<AppSettingsData>("GET", "/api/settings"),

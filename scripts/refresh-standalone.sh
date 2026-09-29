@@ -42,7 +42,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
 
 echo "== [3/4] swap fresh backend into win-unpacked =="
 rm -rf "$WIN_UNPACKED/resources/backend"
-cp -r "backend/packaging/dist/jira-tracker-backend" "$WIN_UNPACKED/resources/backend"
+[ -e "$WIN_UNPACKED/resources/backend" ] && { echo "OLD BACKEND STILL LOCKED (is the app running?)"; exit 1; }
+mkdir -p "$WIN_UNPACKED/resources/backend"
+cp -r "backend/packaging/dist/jira-tracker-backend/." "$WIN_UNPACKED/resources/backend/"
+# A freshly built exe can be briefly locked (Defender scan / OneDrive), and cp
+# then silently skips it; retry, and fail loudly rather than ship no backend.
+for i in 1 2 3 4 5; do
+  [ -f "$WIN_UNPACKED/resources/backend/jira-tracker-backend.exe" ] && break
+  sleep 3
+  cp "backend/packaging/dist/jira-tracker-backend/jira-tracker-backend.exe" "$WIN_UNPACKED/resources/backend/" 2>/dev/null
+done
+[ -f "$WIN_UNPACKED/resources/backend/jira-tracker-backend.exe" ] || { echo "BACKEND EXE COPY FAILED"; exit 1; }
 
 echo "== [4/4] repack app.asar (main.js + preload + renderer + assets) =="
 STAGE="$(mktemp -d)"

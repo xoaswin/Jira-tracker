@@ -30,6 +30,7 @@ from app.routers import (
     issues,
     manage,
     match,
+    mobile,
     my_tickets,
     outbox,
     reports,
@@ -60,6 +61,10 @@ async def lifespan(app: FastAPI):
     # Desktop build: exit with the Electron shell even if it is killed hard,
     # so no orphan keeps port 8756 and the DB locked.
     watch_parent_process()
+    # Resume the phone companion's LAN listener if a phone was paired before.
+    from app.mobile.server import start_if_paired
+
+    start_if_paired()
 
     # Start the background outbox poller (Phase 2 durability). Disabled under
     # pytest, where tests drive the worker explicitly and a background loop would
@@ -152,6 +157,7 @@ app.include_router(velocity_router.router)
 app.include_router(insights_router.router)
 app.include_router(assistant.router)
 app.include_router(wrapup.router)
+app.include_router(mobile.router)
 
 
 # --- Production static serving (single process on 8756) ---

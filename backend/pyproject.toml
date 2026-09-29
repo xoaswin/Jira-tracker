@@ -19,6 +19,8 @@ dependencies = [
     "numpy",
     # IANA zone data for zoneinfo: Windows has no system tz database.
     "tzdata",
+    # QR code (pure Python) for pairing the phone companion.
+    "segno",
 ]
 
 [project.optional-dependencies]
