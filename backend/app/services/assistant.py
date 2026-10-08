@@ -638,9 +638,11 @@ def execute_action(db: Session, atype: str, args: dict, local_date: str | None =
                 sub = create_subtask(db, client, str(a["parent_key"]), str(a["summary"]))
                 return {"ok": True, "message": f"Created subtask {sub} under {a['parent_key']}."}
             if atype == "set_ticket_dates":
-                from app.jira.editmeta import get_editable_date_fields, update_issue_fields
                 from datetime import date as calendar_date
+
                 from dateutil.parser import isoparse
+
+                from app.jira.editmeta import get_editable_date_fields, update_issue_fields
 
                 key = str(a["issue_key"])
                 values = a.get("values")
