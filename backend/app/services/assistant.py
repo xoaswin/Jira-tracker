@@ -62,6 +62,7 @@ ACTION_TYPES = {
     "mark_done",
     "create_subtask",
     "set_due_date",
+    "set_ticket_dates",
     "set_priority",
     "reassign",
 }
@@ -210,6 +211,22 @@ ACTION_TOOLS = [
         },
     },
 ]
+
+ACTION_TOOLS.append({
+    "type": "function",
+    "function": {
+        "name": "set_ticket_dates",
+        "description": "Set Jira date or datetime fields, including custom Start Date, Actual Start and Actual End. First call get_ticket to discover exact editable field IDs and types. Only use dates/times explicitly given by the user; never invent actual work times. Times without an offset are wall time in the configured app timezone.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "issue_key": {"type": "string"},
+                "values": {"type": "object", "description": "Map of editable Jira date field IDs (from get_ticket.date_fields) to ISO dates YYYY-MM-DD or local datetimes YYYY-MM-DDTHH:MM"},
+            },
+            "required": ["issue_key", "values"],
+        },
+    },
+})
 
 READ_TOOLS = [
     {
@@ -557,6 +574,8 @@ def _summary_for(name: str, args: dict) -> str:
         return f"Add subtask under {args.get('parent_key')}: {args.get('summary')}"
     if name == "set_due_date":
         return f"Set {args.get('issue_key')} due date to {args.get('date')}"
+    if name == "set_ticket_dates":
+        return f"Set {args.get('issue_key')} date fields: {args.get('values')}"
     if name == "set_priority":
         return f"Set {args.get('issue_key')} priority to {args.get('priority')}"
     if name == "reassign":
@@ -618,8 +637,37 @@ def execute_action(db: Session, atype: str, args: dict, local_date: str | None =
             if atype == "create_subtask":
                 sub = create_subtask(db, client, str(a["parent_key"]), str(a["summary"]))
                 return {"ok": True, "message": f"Created subtask {sub} under {a['parent_key']}."}
+            if atype == "set_ticket_dates":
+                from app.jira.editmeta import get_editable_date_fields, update_issue_fields
+                from datetime import date as calendar_date
+                from dateutil.parser import isoparse
+
+                key = str(a["issue_key"])
+                values = a.get("values")
+                if not isinstance(values, dict) or not values:
+                    return {"ok": False, "message": "No date fields specified."}
+                editable = get_editable_date_fields(client, key)
+                by_id = {f.field_id: f for f in editable}
+                for field_id, value in values.items():
+                    field = by_id.get(field_id)
+                    if field is None or not isinstance(value, str):
+                        return {"ok": False, "message": f"Invalid or non-editable date field: {field_id}"}
+                    try:
+                        if field.schema_type == "date":
+                            if calendar_date.fromisoformat(value).isoformat() != value:
+                                raise ValueError(value)
+                        elif field.schema_type == "datetime":
+                            parsed = isoparse(value)
+                            if "T" not in value or parsed.tzinfo is not None:
+                                raise ValueError(value)
+                        else:
+                            raise ValueError(value)
+                    except ValueError:
+                        return {"ok": False, "message": f"Invalid {field.schema_type} for {field.name}: {value}"}
+                update_issue_fields(client, key, values, editable=editable, tz=app_tz(db))
+                return {"ok": True, "message": f"Updated date fields on {key}."}
             if atype == "set_due_date":
-                edit_dates(client, str(a["issue_key"]), {"duedate": str(a["date"])})
+                edit_dates(client, str(a["issue_key"]), {"duedate": str(a["date"])}, app_tz(db))
                 return {"ok": True, "message": f"Set {a['issue_key']} due {a['date']}."}
             if atype == "set_priority":
                 want = str(a.get("priority") or "").strip().lower()
